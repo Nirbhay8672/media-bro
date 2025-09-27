@@ -86,6 +86,7 @@ interface CanvasElement {
         imageUrl?: string;
         imageFit?: string;
         backgroundColor?: string;
+        imageShape?: string;
     };
 }
 
@@ -129,7 +130,8 @@ const createElement = (type: CanvasElement['type'], x: number, y: number) => {
             textShadow: 'none',
             imageUrl: type === 'image' ? '' : undefined,
             imageFit: type === 'image' ? 'contain' : undefined,
-            backgroundColor: type === 'text' ? 'transparent' : (type === 'image' ? 'transparent' : '#000000')
+            backgroundColor: type === 'text' ? 'transparent' : (type === 'image' ? 'transparent' : '#000000'),
+            imageShape: type === 'image' ? 'rectangle' : undefined
         }
     };
     

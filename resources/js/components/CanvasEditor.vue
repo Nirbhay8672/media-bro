@@ -34,6 +34,7 @@ interface CanvasElement {
         imageUrl?: string;
         imageFit?: string;
         backgroundColor?: string;
+        imageShape?: string;
     };
 }
 
@@ -103,6 +104,13 @@ const handleMouseUp = (event: MouseEvent) => {
 
 const selectElement = (element: CanvasElement) => {
     emit('selectElement', element);
+};
+
+const handlePlaceholderClick = (element: CanvasElement) => {
+    // Select the element when placeholder is clicked
+    selectElement(element);
+    // You could also emit a special event here if you want to open an image picker
+    // emit('openImagePicker', element.id);
 };
 
 const bringToFront = (elementId: string) => {
@@ -179,6 +187,27 @@ const handleResize = (event: MouseEvent) => {
 
 const handleResizeEnd = () => {
     isResizing.value = false;
+};
+
+// Image shape clip paths
+const getImageClipPath = (shape: string) => {
+    switch (shape) {
+        case 'circle':
+            return 'circle(50% at 50% 50%)';
+        case 'triangle':
+            return 'polygon(50% 0%, 0% 100%, 100% 100%)';
+        case 'star':
+            return 'polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%)';
+        case 'diamond':
+            return 'polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%)';
+        case 'hexagon':
+            return 'polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%)';
+        case 'octagon':
+            return 'polygon(30% 0%, 70% 0%, 100% 30%, 100% 70%, 70% 100%, 30% 100%, 0% 70%, 0% 30%)';
+        case 'rectangle':
+        default:
+            return 'none';
+    }
 };
 
 </script>
@@ -304,7 +333,8 @@ const handleResizeEnd = () => {
                                 <div v-else-if="element.type === 'image'" class="w-full h-full flex items-center justify-center text-center" :style="{
                                     backgroundColor: element.properties.backgroundColor || 'transparent',
                                     border: `${element.properties.borderWidth || 0}px ${element.properties.borderStyle || 'solid'} ${element.properties.borderColor || '#000000'}`,
-                                    borderRadius: (element.properties.borderRadius || 0) + 'px'
+                                    borderRadius: (element.properties.borderRadius || 0) + 'px',
+                                    clipPath: getImageClipPath(element.properties.imageShape || 'rectangle')
                                 }">
                                     <img
                                         v-if="element.properties.imageUrl"
@@ -313,7 +343,14 @@ const handleResizeEnd = () => {
                                         class="max-w-full max-h-full"
                                         :style="{ objectFit: element.properties.imageFit || 'contain' } as any"
                                     />
-                                    <div v-else class="text-gray-400 text-sm">No Image</div>
+                                    <div v-else class="w-full h-full flex items-center justify-center text-blue-500 bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-blue-900/20 dark:to-indigo-900/20 border-2 border-dashed border-blue-300 dark:border-blue-600 rounded-lg cursor-pointer hover:from-blue-100 hover:to-indigo-200 dark:hover:from-blue-800/30 dark:hover:to-indigo-800/30 hover:border-blue-400 dark:hover:border-blue-500 transition-all duration-200" @click="handlePlaceholderClick(element)">
+                                        <div class="relative">
+                                            <svg class="w-12 h-12 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                                            </svg>
+                                            <div class="absolute -top-1 -right-1 w-3 h-3 bg-green-400 rounded-full animate-pulse"></div>
+                                        </div>
+                                    </div>
                                 </div>
 
                                 <!-- Rectangle Element -->

@@ -34,6 +34,7 @@ interface CanvasElement {
         imageUrl?: string;
         imageFit?: string;
         backgroundColor?: string;
+        imageShape?: string;
     };
 }
 
@@ -82,6 +83,17 @@ const borderStyles = [
     { name: 'Ridge', value: 'ridge' },
     { name: 'Inset', value: 'inset' },
     { name: 'Outset', value: 'outset' }
+];
+
+// Image shapes
+const imageShapes = [
+    { name: 'Rectangle', value: 'rectangle' },
+    { name: 'Circle', value: 'circle' },
+    { name: 'Triangle', value: 'triangle' },
+    { name: 'Star', value: 'star' },
+    { name: 'Diamond', value: 'diamond' },
+    { name: 'Hexagon', value: 'hexagon' },
+    { name: 'Octagon', value: 'octagon' }
 ];
 
 // Color palette
@@ -294,6 +306,20 @@ const getCheckboxChecked = (event: Event): boolean => {
 
                     <!-- Image Styles (only for image elements) -->
                     <div v-if="selectedElement.type === 'image'" class="space-y-2">
+                        <!-- Image Shape -->
+                        <div>
+                            <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
+                                Image Shape
+                            </label>
+                            <select
+                                :value="selectedElement.properties.imageShape || 'rectangle'"
+                                @change="updateElementProperty('imageShape', getInputValue($event))"
+                                class="w-full px-2 py-1 border border-gray-300 dark:border-gray-600 rounded text-sm focus:ring-1 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+                            >
+                                <option v-for="shape in imageShapes" :key="shape.value" :value="shape.value">{{ shape.name }}</option>
+                            </select>
+                        </div>
+
                         <!-- Image Fit -->
                         <div>
                             <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
