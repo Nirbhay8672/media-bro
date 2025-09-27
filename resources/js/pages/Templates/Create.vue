@@ -145,7 +145,7 @@ const selectElement = (element: CanvasElement) => {
 };
 
 // Element property updates
-const updateElementProperty = (elementId: string, property: keyof CanvasElement['properties'], value: any) => {
+const updateElementProperty = (elementId: string, property: string, value: any) => {
     const elementIndex = canvasElements.value.findIndex(el => el.id === elementId);
     if (elementIndex !== -1) {
         const element = canvasElements.value[elementIndex];
@@ -306,10 +306,10 @@ const handleKeydown = (event: KeyboardEvent) => {
     <Head title="Create Template" />
 
     <AppLayout :breadcrumbs="breadcrumbs">
-        <div class="h-screen bg-gray-50 dark:bg-gray-900 overflow-hidden" @click="closeDropdownOnOutsideClick" @keydown="handleKeydown">
+        <div class="min-h-screen bg-gray-50 dark:bg-gray-900" @click="closeDropdownOnOutsideClick" @keydown="handleKeydown">
             <!-- Main Content -->
-            <div class="w-full h-full px-4 py-4">
-                <form @submit.prevent="submitForm" class="flex h-full gap-4">
+            <div class="w-full px-4 py-4">
+                <form @submit.prevent="submitForm" class="flex gap-4">
                     <!-- Left Sidebar - Template Settings -->
                     <TemplateSettings
                         v-model:form="form"
@@ -339,8 +339,8 @@ const handleKeydown = (event: KeyboardEvent) => {
                     />
 
                     <!-- Right Sidebar - Tools & Properties -->
-                    <div class="w-72 flex-shrink-0 flex flex-col">
-                        <div class="flex-1 space-y-3 overflow-y-auto">
+                    <div class="w-72 flex-shrink-0">
+                        <div class="space-y-3">
                             <!-- Tools -->
                             <ToolsPanel
                                 v-model:selectedTool="selectedTool"

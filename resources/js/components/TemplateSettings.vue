@@ -80,11 +80,11 @@ const handleKeydown = (event: KeyboardEvent) => {
 
 <template>
     <div class="w-72 flex-shrink-0">
-        <div class="h-full bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
             <div class="p-4 border-b border-gray-200 dark:border-gray-700">
                 <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Template Settings</h2>
             </div>
-            <div class="h-[calc(100%-80px)] p-4 space-y-3 overflow-y-auto">
+            <div class="p-4 space-y-3">
                 <!-- Template Name -->
                 <div>
                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">

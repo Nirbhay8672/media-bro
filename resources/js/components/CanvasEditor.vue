@@ -114,8 +114,8 @@ const deleteElement = (elementId: string) => {
 </script>
 
 <template>
-    <div class="flex-1 min-w-0 flex flex-col">
-        <div class="flex-1 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 flex flex-col">
+    <div class="flex-1 min-w-0">
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
             <!-- Canvas Editor Header -->
             <div class="pt-5 px-4 pb-2 border-b border-gray-200 dark:border-gray-700">
                 <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Template Editor</h2>
@@ -168,7 +168,7 @@ const deleteElement = (elementId: string) => {
                 </div>
             </div>
 
-            <div class="flex-1 p-4 overflow-auto">
+            <div class="p-4">
                 <div class="flex justify-center w-full">
                     <div class="relative">
                         <!-- Canvas -->

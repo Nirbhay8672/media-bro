@@ -42,7 +42,7 @@ interface Props {
 }
 
 interface Emits {
-    (e: 'updateElement', elementId: string, property: string, value: any): void;
+    (e: 'updateElement', elementId: string, property: keyof CanvasElement['properties'], value: any): void;
     (e: 'bringToFront', elementId: string): void;
     (e: 'sendToBack', elementId: string): void;
     (e: 'duplicateElement', elementId: string): void;
