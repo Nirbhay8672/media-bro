@@ -1,16 +1,21 @@
 <script setup lang="ts">
-import AppLogoIcon from '@/components/AppLogoIcon.vue';
+// No imports needed for image logo
 </script>
 
 <template>
-    <div
-        class="flex aspect-square size-8 items-center justify-center rounded-md bg-sidebar-primary text-sidebar-primary-foreground"
-    >
-        <AppLogoIcon class="size-5 fill-current text-white dark:text-black" />
-    </div>
-    <div class="ml-1 grid flex-1 text-left text-sm">
-        <span class="mb-0.5 truncate leading-tight font-semibold"
-            >Laravel Starter Kit</span
-        >
+    <div class="flex items-center gap-4">
+        <div class="flex aspect-square size-12 items-center justify-center rounded-lg overflow-hidden bg-sidebar-accent/20 p-1">
+            <img 
+                src="/images/logo.png" 
+                alt="Media Bro Logo" 
+                class="w-full h-full object-contain"
+            />
+        </div>
+        <div class="grid flex-1 text-left">
+            <span class="text-base font-bold truncate leading-tight text-sidebar-foreground"
+                >Media Bro</span
+            >
+            <span class="text-sm truncate text-sidebar-foreground/70 font-medium">Design Studio</span>
+        </div>
     </div>
 </template>
