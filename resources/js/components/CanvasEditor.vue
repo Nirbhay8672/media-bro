@@ -1,0 +1,321 @@
+<script setup lang="ts">
+import { computed } from 'vue';
+import { Upload, Layers, Copy, Trash2 } from 'lucide-vue-next';
+
+interface CanvasElement {
+    id: string;
+    type: 'text' | 'image' | 'rectangle' | 'circle' | 'triangle' | 'star' | 'heart';
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    rotation: number;
+    zIndex: number;
+    properties: {
+        text?: string;
+        fontSize?: number;
+        fontFamily?: string;
+        fontWeight?: string;
+        fontStyle?: string;
+        textDecoration?: string;
+        textAlign?: string;
+        lineHeight?: number;
+        color?: string;
+        fillColor?: string;
+        strokeColor?: string;
+        strokeWidth?: number;
+        hasBorder?: boolean;
+        borderWidth?: number;
+        borderStyle?: string;
+        borderColor?: string;
+        borderRadius?: number;
+        boxShadow?: string;
+        textShadow?: string;
+        imageUrl?: string;
+        imageFit?: string;
+        backgroundColor?: string;
+    };
+}
+
+interface Props {
+    form: {
+        width: number;
+        height: number;
+    };
+    backgroundImagePreview: string | null;
+    canvasElements: CanvasElement[];
+    selectedElement: CanvasElement | null;
+    selectedTool: string;
+}
+
+interface Emits {
+    (e: 'canvasClick', event: MouseEvent): void;
+    (e: 'elementMouseDown', event: MouseEvent, element: CanvasElement): void;
+    (e: 'mouseMove', event: MouseEvent): void;
+    (e: 'mouseUp', event: MouseEvent): void;
+    (e: 'selectElement', element: CanvasElement): void;
+    (e: 'bringToFront', elementId: string): void;
+    (e: 'sendToBack', elementId: string): void;
+    (e: 'duplicateElement', elementId: string): void;
+    (e: 'deleteElement', elementId: string): void;
+}
+
+const props = defineProps<Props>();
+const emit = defineEmits<Emits>();
+
+const canvasStyle = computed(() => ({
+    width: Math.min(props.form.width, 600) + 'px',
+    height: Math.min(props.form.height, 400) + 'px',
+    backgroundImage: props.backgroundImagePreview ? `url(${props.backgroundImagePreview})` : 'none',
+    backgroundSize: 'cover',
+    backgroundPosition: 'center',
+    backgroundRepeat: 'no-repeat'
+}));
+
+const sortedElements = computed(() => {
+    return [...props.canvasElements].sort((a, b) => a.zIndex - b.zIndex);
+});
+
+const handleCanvasClick = (event: MouseEvent) => {
+    emit('canvasClick', event);
+};
+
+const handleElementMouseDown = (event: MouseEvent, element: CanvasElement) => {
+    emit('elementMouseDown', event, element);
+};
+
+const handleMouseMove = (event: MouseEvent) => {
+    emit('mouseMove', event);
+};
+
+const handleMouseUp = (event: MouseEvent) => {
+    emit('mouseUp', event);
+};
+
+const selectElement = (element: CanvasElement) => {
+    emit('selectElement', element);
+};
+
+const bringToFront = (elementId: string) => {
+    emit('bringToFront', elementId);
+};
+
+const sendToBack = (elementId: string) => {
+    emit('sendToBack', elementId);
+};
+
+const duplicateElement = (elementId: string) => {
+    emit('duplicateElement', elementId);
+};
+
+const deleteElement = (elementId: string) => {
+    emit('deleteElement', elementId);
+};
+</script>
+
+<template>
+    <div class="flex-1 min-w-0 flex flex-col">
+        <div class="flex-1 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 flex flex-col">
+            <!-- Canvas Editor Header -->
+            <div class="pt-5 px-4 pb-2 border-b border-gray-200 dark:border-gray-700">
+                <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Template Editor</h2>
+            </div>
+
+            <!-- Quick Actions Toolbar -->
+            <div class="px-4 py-2 border-b border-gray-200 dark:border-gray-700">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-2">
+                        <button
+                            type="button"
+                            @click="selectedElement && bringToFront(selectedElement.id)"
+                            :disabled="!selectedElement"
+                            class="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            <Layers class="h-3 w-3" />
+                            Bring to Front
+                        </button>
+                        <button
+                            type="button"
+                            @click="selectedElement && sendToBack(selectedElement.id)"
+                            :disabled="!selectedElement"
+                            class="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            <Layers class="h-3 w-3 rotate-180" />
+                            Send to Back
+                        </button>
+                        <button
+                            type="button"
+                            @click="selectedElement && duplicateElement(selectedElement.id)"
+                            :disabled="!selectedElement"
+                            class="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            <Copy class="h-3 w-3" />
+                            Duplicate
+                        </button>
+                        <button
+                            type="button"
+                            @click="selectedElement && deleteElement(selectedElement.id)"
+                            :disabled="!selectedElement"
+                            class="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-red-700 dark:text-red-300 bg-red-100 dark:bg-red-900 rounded-lg hover:bg-red-200 dark:hover:bg-red-800 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            <Trash2 class="h-3 w-3" />
+                            Delete
+                        </button>
+                    </div>
+                    <div class="text-sm text-gray-500 dark:text-gray-400">
+                        {{ canvasElements.length }} element{{ canvasElements.length !== 1 ? 's' : '' }}
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex-1 p-4 overflow-auto">
+                <div class="flex justify-center w-full">
+                    <div class="relative">
+                        <!-- Canvas -->
+                        <div
+                            class="relative overflow-hidden border-2 border-gray-300 bg-gray-50 dark:border-gray-600 dark:bg-gray-700 shadow-lg rounded-lg cursor-crosshair"
+                            :style="canvasStyle"
+                            @click="handleCanvasClick"
+                            @mousemove="handleMouseMove"
+                            @mouseup="handleMouseUp"
+                        >
+                            <!-- Background Image -->
+                            <div v-if="backgroundImagePreview" class="absolute inset-0 bg-cover bg-center bg-no-repeat" :style="{ backgroundImage: `url(${backgroundImagePreview})` }"></div>
+
+                            <!-- Empty State -->
+                            <div v-if="!backgroundImagePreview && canvasElements.length === 0" class="flex h-full w-full items-center justify-center">
+                                <div class="text-center">
+                                    <div class="mx-auto h-16 w-16 bg-gray-100 dark:bg-gray-600 rounded-full flex items-center justify-center mb-4">
+                                        <Upload class="h-8 w-8 text-gray-400" />
+                                    </div>
+                                    <h3 class="text-lg font-medium text-gray-900 dark:text-white mb-2">Start Creating</h3>
+                                    <p class="text-sm text-gray-500 dark:text-gray-400">
+                                        Select a tool and click on the canvas to add elements
+                                    </p>
+                                </div>
+                            </div>
+
+                            <!-- Canvas Elements -->
+                            <div
+                                v-for="element in sortedElements"
+                                :key="element.id"
+                                :class="[
+                                    'absolute cursor-move select-none',
+                                    selectedElement?.id === element.id ? 'ring-2 ring-blue-500' : ''
+                                ]"
+                                :style="{
+                                    left: element.x + 'px',
+                                    top: element.y + 'px',
+                                    width: element.width + 'px',
+                                    height: element.height + 'px',
+                                    transform: `rotate(${element.rotation}deg)`,
+                                    zIndex: element.zIndex,
+                                    filter: element.properties.boxShadow !== 'none' ? element.properties.boxShadow : 'none',
+                                    textShadow: element.properties.textShadow
+                                }"
+                                @mousedown="handleElementMouseDown($event, element)"
+                                @click.stop="selectElement(element)"
+                            >
+                                <!-- Text Element -->
+                                <div v-if="element.type === 'text'" class="w-full h-full flex items-center justify-center text-center" :style="{
+                                    fontSize: (element.properties.fontSize || 16) + 'px',
+                                    fontFamily: element.properties.fontFamily || 'Arial',
+                                    fontWeight: element.properties.fontWeight || 'normal',
+                                    fontStyle: element.properties.fontStyle || 'normal',
+                                    textDecoration: element.properties.textDecoration || 'none',
+                                    textAlign: element.properties.textAlign || 'left',
+                                    lineHeight: String(element.properties.lineHeight || 1.2),
+                                    color: element.properties.color || '#000000'
+                                }">
+                                    {{ element.properties.text || 'Text' }}
+                                </div>
+
+                                <!-- Image Element -->
+                                <div v-else-if="element.type === 'image'" class="w-full h-full flex items-center justify-center text-center" :style="{
+                                    backgroundColor: element.properties.backgroundColor || 'transparent',
+                                    border: `${element.properties.borderWidth || 0}px ${element.properties.borderStyle || 'solid'} ${element.properties.borderColor || '#000000'}`,
+                                    borderRadius: (element.properties.borderRadius || 0) + 'px'
+                                }">
+                                    <img
+                                        v-if="element.properties.imageUrl"
+                                        :src="element.properties.imageUrl"
+                                        :alt="element.properties.text || 'Image'"
+                                        class="max-w-full max-h-full"
+                                        :style="{ objectFit: element.properties.imageFit || 'contain' }"
+                                    />
+                                    <div v-else class="text-gray-400 text-sm">No Image</div>
+                                </div>
+
+                                <!-- Rectangle Element -->
+                                <div v-else-if="element.type === 'rectangle'" class="w-full h-full" :style="{
+                                    backgroundColor: element.properties.fillColor,
+                                    border: element.properties.hasBorder ? `${element.properties.strokeWidth}px ${element.properties.borderStyle} ${element.properties.strokeColor}` : 'none',
+                                    borderRadius: (element.properties.borderRadius || 0) + 'px'
+                                }"></div>
+
+                                <!-- Circle Element -->
+                                <div v-else-if="element.type === 'circle'" class="w-full h-full rounded-full" :style="{
+                                    backgroundColor: element.properties.fillColor,
+                                    border: element.properties.hasBorder ? `${element.properties.strokeWidth}px ${element.properties.borderStyle} ${element.properties.strokeColor}` : 'none'
+                                }"></div>
+
+                                <!-- Triangle Element -->
+                                <div v-else-if="element.type === 'triangle'" class="w-full h-full" :style="{
+                                    backgroundColor: element.properties.fillColor,
+                                    border: element.properties.hasBorder ? `${element.properties.strokeWidth}px ${element.properties.borderStyle} ${element.properties.strokeColor}` : 'none',
+                                    clipPath: 'polygon(50% 0%, 0% 100%, 100% 100%)'
+                                }"></div>
+
+                                <!-- Star Element -->
+                                <div v-else-if="element.type === 'star'" class="w-full h-full" :style="{
+                                    backgroundColor: element.properties.fillColor,
+                                    border: element.properties.hasBorder ? `${element.properties.strokeWidth}px ${element.properties.borderStyle} ${element.properties.strokeColor}` : 'none',
+                                    clipPath: 'polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%)'
+                                }"></div>
+
+                                <!-- Heart Element -->
+                                <div v-else-if="element.type === 'heart'" class="w-full h-full heart-shape" :style="{
+                                    backgroundColor: element.properties.fillColor,
+                                    border: element.properties.hasBorder ? `${element.properties.strokeWidth}px ${element.properties.borderStyle} ${element.properties.strokeColor}` : 'none'
+                                }"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Status Bar -->
+            <div class="px-4 py-2 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700">
+                <div class="flex items-center justify-between text-sm">
+                    <div class="flex items-center gap-4">
+                        <div>
+                            <span class="font-medium text-gray-900 dark:text-white">Elements:</span>
+                            <span class="text-blue-600 dark:text-blue-400 ml-1">{{ canvasElements.length }}</span>
+                        </div>
+                        <div class="w-px h-4 bg-gray-300 dark:bg-gray-600"></div>
+                        <div class="text-sm">
+                            <span class="font-medium text-gray-900 dark:text-white">Status:</span>
+                            <span class="text-green-600 dark:text-green-400 ml-1">
+                                {{ backgroundImagePreview ? 'Ready' : 'No background' }}
+                            </span>
+                        </div>
+                        <div class="w-px h-4 bg-gray-300 dark:bg-gray-600"></div>
+                        <div class="text-sm">
+                            <span class="font-medium text-gray-900 dark:text-white">Mode:</span>
+                            <span class="text-blue-600 dark:text-blue-400 ml-1">Draft</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                    Elements are in draft mode. They will be saved when you create the template.
+                </div>
+            </div>
+        </div>
+    </div>
+</template>
+
+<style scoped>
+.heart-shape {
+    clip-path: path("M12,21.35l-1.45-1.32C5.4,15.36,2,12.28,2,8.5 C2,5.42,4.42,3,7.5,3c1.74,0,3.41,0.81,4.5,2.09C13.09,3.81,14.76,3,16.5,3 C19.58,3,22,5.42,22,8.5c0,3.78-3.4,6.86-8.55,11.54L12,21.35z");
+}
+</style>
