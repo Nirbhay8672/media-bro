@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Move, Type, Image, Square, Circle, Triangle, Star, Heart } from 'lucide-vue-next';
+import { Move, Type, Image, Square, Circle, Triangle, Star } from 'lucide-vue-next';
 
 interface Props {
     selectedTool: string;
@@ -21,7 +21,6 @@ const tools = [
     { id: 'circle', name: 'Circle', icon: Circle },
     { id: 'triangle', name: 'Triangle', icon: Triangle },
     { id: 'star', name: 'Star', icon: Star },
-    { id: 'heart', name: 'Heart', icon: Heart },
 ];
 
 const selectTool = (toolId: string) => {

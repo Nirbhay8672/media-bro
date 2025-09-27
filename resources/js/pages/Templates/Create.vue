@@ -56,7 +56,7 @@ const canvasElements = ref<CanvasElement[]>([]);
 // CanvasElement interface
 interface CanvasElement {
     id: string;
-    type: 'text' | 'image' | 'rectangle' | 'circle' | 'triangle' | 'star' | 'heart';
+    type: 'text' | 'image' | 'rectangle' | 'circle' | 'triangle' | 'star';
     x: number;
     y: number;
     width: number;
@@ -237,6 +237,26 @@ const deleteElement = (elementId: string) => {
     }
 };
 
+// Resize element handler
+const handleResizeElement = (elementId: string, width: number, height: number, x: number, y: number, fontSize?: number) => {
+    const element = canvasElements.value.find(el => el.id === elementId);
+    if (element) {
+        element.width = width;
+        element.height = height;
+        element.x = x;
+        element.y = y;
+        
+        // Update font size for text elements
+        if (element.type === 'text' && fontSize !== undefined) {
+            element.properties.fontSize = fontSize;
+        }
+        
+        if (selectedElement.value?.id === elementId) {
+            selectedElement.value = { ...element };
+        }
+    }
+};
+
 
 // Quick template functions
 const applyQuickTemplate = (template: { name: string; width: number; height: number }) => {
@@ -337,6 +357,7 @@ const handleKeydown = (event: KeyboardEvent) => {
                         @sendToBack="sendToBack"
                         @duplicateElement="duplicateElement"
                         @deleteElement="deleteElement"
+                        @resizeElement="handleResizeElement"
                     />
 
                     <!-- Right Sidebar - Tools & Properties -->

@@ -4,7 +4,7 @@ import { Upload, Layers, Copy, Trash2 } from 'lucide-vue-next';
 
 interface CanvasElement {
     id: string;
-    type: 'text' | 'image' | 'rectangle' | 'circle' | 'triangle' | 'star' | 'heart';
+    type: 'text' | 'image' | 'rectangle' | 'circle' | 'triangle' | 'star';
     x: number;
     y: number;
     width: number;
@@ -58,6 +58,7 @@ interface Emits {
     (e: 'sendToBack', elementId: string): void;
     (e: 'duplicateElement', elementId: string): void;
     (e: 'deleteElement', elementId: string): void;
+    (e: 'resizeElement', elementId: string, width: number, height: number, x: number, y: number, fontSize?: number): void;
 }
 
 const props = defineProps<Props>();
@@ -85,11 +86,19 @@ const handleElementMouseDown = (event: MouseEvent, element: CanvasElement) => {
 };
 
 const handleMouseMove = (event: MouseEvent) => {
-    emit('mouseMove', event);
+    if (isResizing.value) {
+        handleResize(event);
+    } else {
+        emit('mouseMove', event);
+    }
 };
 
 const handleMouseUp = (event: MouseEvent) => {
-    emit('mouseUp', event);
+    if (isResizing.value) {
+        handleResizeEnd();
+    } else {
+        emit('mouseUp', event);
+    }
 };
 
 const selectElement = (element: CanvasElement) => {
@@ -110,6 +119,66 @@ const duplicateElement = (elementId: string) => {
 
 const deleteElement = (elementId: string) => {
     emit('deleteElement', elementId);
+};
+
+// Resize functionality - single handle at bottom right
+const isResizing = ref(false);
+const resizeStart = ref({ x: 0, y: 0, width: 0, height: 0, elementX: 0, elementY: 0, originalFontSize: 0 });
+
+const handleResizeStart = (event: MouseEvent, element: CanvasElement) => {
+    event.preventDefault();
+    event.stopPropagation();
+    
+    isResizing.value = true;
+    resizeStart.value = {
+        x: event.clientX,
+        y: event.clientY,
+        width: element.width,
+        height: element.height,
+        elementX: element.x,
+        elementY: element.y,
+        originalFontSize: element.properties.fontSize || 16
+    };
+    
+    // Select the element if it's not already selected
+    if (props.selectedElement?.id !== element.id) {
+        selectElement(element);
+    }
+};
+
+const handleResize = (event: MouseEvent) => {
+    if (!isResizing.value || !props.selectedElement) return;
+    
+    const deltaX = event.clientX - resizeStart.value.x;
+    const deltaY = event.clientY - resizeStart.value.y;
+    
+    let newWidth = Math.max(20, resizeStart.value.width + deltaX);
+    let newHeight = Math.max(20, resizeStart.value.height + deltaY);
+    
+    // Check if Shift is pressed for proportional resizing
+    const isShiftPressed = event.shiftKey;
+    
+    if (isShiftPressed) {
+        // Proportional resizing - maintain aspect ratio
+        const aspectRatio = resizeStart.value.width / resizeStart.value.height;
+        const maxDelta = Math.max(deltaX, deltaY);
+        newWidth = Math.max(20, resizeStart.value.width + maxDelta);
+        newHeight = Math.max(20, resizeStart.value.height + maxDelta);
+    }
+    
+    // Calculate font size for text elements
+    let newFontSize = resizeStart.value.originalFontSize;
+    if (props.selectedElement.type === 'text') {
+        const heightRatio = newHeight / resizeStart.value.height;
+        newFontSize = Math.max(8, Math.round(resizeStart.value.originalFontSize * heightRatio));
+    }
+    
+    // Emit resize event
+    emit('resizeElement', props.selectedElement.id, newWidth, newHeight, props.selectedElement.x, props.selectedElement.y, newFontSize);
+};
+
+const handleResizeEnd = () => {
+    isResizing.value = false;
 };
 
 </script>
@@ -274,11 +343,9 @@ const deleteElement = (elementId: string) => {
                                     clipPath: 'polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%)'
                                 }"></div>
 
-                                <!-- Heart Element -->
-                                <div v-else-if="element.type === 'heart'" class="w-full h-full heart-shape" :style="{
-                                    backgroundColor: element.properties.fillColor,
-                                    border: element.properties.hasBorder ? `${element.properties.strokeWidth}px ${element.properties.borderStyle} ${element.properties.strokeColor}` : 'none'
-                                }"></div>
+
+                                <!-- Single Resize Handle (only show when selected) -->
+                                <div v-if="selectedElement?.id === element.id" class="absolute -bottom-1 -right-1 w-4 h-4 bg-blue-500 border-2 border-white rounded-full pointer-events-auto cursor-se-resize hover:bg-blue-600 transition-colors shadow-lg" @mousedown="handleResizeStart($event, element)" title="Resize (Shift+drag for proportional)"></div>
                             </div>
                         </div>
                     </div>
@@ -316,7 +383,4 @@ const deleteElement = (elementId: string) => {
 </template>
 
 <style scoped>
-.heart-shape {
-    clip-path: path("M12,21.35l-1.45-1.32C5.4,15.36,2,12.28,2,8.5 C2,5.42,4.42,3,7.5,3c1.74,0,3.41,0.81,4.5,2.09C13.09,3.81,14.76,3,16.5,3 C19.58,3,22,5.42,22,8.5c0,3.78-3.4,6.86-8.55,11.54L12,21.35z");
-}
 </style>

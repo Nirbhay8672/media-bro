@@ -4,7 +4,7 @@ import { Layers, Copy, Trash2 } from 'lucide-vue-next';
 
 interface CanvasElement {
     id: string;
-    type: 'text' | 'image' | 'rectangle' | 'circle' | 'triangle' | 'star' | 'heart';
+    type: 'text' | 'image' | 'rectangle' | 'circle' | 'triangle' | 'star';
     x: number;
     y: number;
     width: number;
@@ -265,50 +265,6 @@ const getCheckboxChecked = (event: Event): boolean => {
                             </div>
                         </div>
 
-                        <!-- Text Alignment -->
-                        <div>
-                            <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
-                                Text Alignment
-                            </label>
-                            <div class="flex gap-1">
-                                <button
-                                    type="button"
-                                    @click="updateElementProperty('textAlign', 'left')"
-                                    :class="[
-                                        'px-2 py-1 text-xs rounded',
-                                        selectedElement.properties.textAlign === 'left'
-                                            ? 'bg-blue-600 text-white'
-                                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600'
-                                    ]"
-                                >
-                                    Left
-                                </button>
-                                <button
-                                    type="button"
-                                    @click="updateElementProperty('textAlign', 'center')"
-                                    :class="[
-                                        'px-2 py-1 text-xs rounded',
-                                        selectedElement.properties.textAlign === 'center'
-                                            ? 'bg-blue-600 text-white'
-                                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600'
-                                    ]"
-                                >
-                                    Center
-                                </button>
-                                <button
-                                    type="button"
-                                    @click="updateElementProperty('textAlign', 'right')"
-                                    :class="[
-                                        'px-2 py-1 text-xs rounded',
-                                        selectedElement.properties.textAlign === 'right'
-                                            ? 'bg-blue-600 text-white'
-                                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600'
-                                    ]"
-                                >
-                                    Right
-                                </button>
-                            </div>
-                        </div>
 
                         <!-- Text Color -->
                         <div>
@@ -404,7 +360,7 @@ const getCheckboxChecked = (event: Event): boolean => {
                     </div>
 
                     <!-- Fill Color (for shapes) -->
-                    <div v-if="['rectangle', 'circle', 'triangle', 'star', 'heart'].includes(selectedElement.type)">
+                    <div v-if="['rectangle', 'circle', 'triangle', 'star'].includes(selectedElement.type)">
                         <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
                             Fill Color
                         </label>
@@ -453,8 +409,8 @@ const getCheckboxChecked = (event: Event): boolean => {
                         </div>
                     </div>
 
-                    <!-- Border Settings -->
-                    <div>
+                    <!-- Border Settings (not for text elements) -->
+                    <div v-if="selectedElement.type !== 'text'">
                         <div class="flex items-center gap-2 mb-2">
                             <input
                                 :checked="selectedElement.properties.hasBorder || false"
