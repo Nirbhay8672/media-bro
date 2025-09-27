@@ -1,0 +1,804 @@
+<script setup lang="ts">
+import { Head } from '@inertiajs/vue3';
+import { Download, Type, Image, Upload } from 'lucide-vue-next';
+import { ref, computed } from 'vue';
+import html2canvas from 'html2canvas';
+
+interface Template {
+    id: number;
+    name: string;
+    description?: string;
+    width: number;
+    height: number;
+    background_image?: string;
+    canvas_data: any[];
+    share_token: string;
+    is_active: boolean;
+}
+
+interface CanvasElement {
+    id: string;
+    type: 'text' | 'image';
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    rotation: number;
+    zIndex: number;
+    properties: {
+        // Text properties
+        text?: string;
+        fontSize?: number;
+        fontFamily?: string;
+        fontWeight?: string;
+        fontStyle?: string;
+        textDecoration?: string;
+        textAlign?: string;
+        lineHeight?: number;
+
+        // Color properties
+        color?: string;
+        backgroundColor?: string;
+
+        // Border properties
+        hasBorder?: boolean;
+        borderWidth?: number;
+        borderColor?: string;
+        borderStyle?: string;
+        borderRadius?: number;
+
+        // Shadow properties
+        boxShadow?: string;
+        textShadow?: string;
+
+        // Image properties
+        imageUrl?: string;
+        imageFit?: string;
+        imagePlaceholder?: string;
+    };
+}
+
+const props = defineProps<{
+    template: Template;
+}>();
+
+// Editor state
+const selectedElement = ref<CanvasElement | null>(null);
+const isGenerating = ref(false);
+
+// Canvas elements - initialize with template data
+const canvasElements = ref<CanvasElement[]>([]);
+
+// Initialize canvas elements with proper defaults
+const initializeCanvasElements = () => {
+    // Handle both array and JSON string formats
+    let templateData;
+    if (Array.isArray(props.template.canvas_data)) {
+        templateData = props.template.canvas_data;
+    } else if (typeof props.template.canvas_data === 'string') {
+        try {
+            templateData = JSON.parse(props.template.canvas_data);
+        } catch (e) {
+            templateData = [];
+        }
+    } else {
+        templateData = [];
+    }
+
+    canvasElements.value = templateData.map((element: any) => ({
+        ...element,
+        properties: {
+            // Text properties
+            text: element.properties?.text || '',
+            fontSize: element.properties?.fontSize || 16,
+            fontFamily: element.properties?.fontFamily || 'Arial',
+            fontWeight: element.properties?.fontWeight || 'normal',
+            fontStyle: element.properties?.fontStyle || 'normal',
+            textDecoration: element.properties?.textDecoration || 'none',
+            textAlign: element.properties?.textAlign || 'left',
+            lineHeight: element.properties?.lineHeight || 1.2,
+
+            // Color properties
+            color: element.properties?.color || '#000000',
+            backgroundColor: element.properties?.backgroundColor || (element.type === 'text' ? 'transparent' : '#f3f4f6'),
+
+            // Border properties
+            hasBorder: element.properties?.hasBorder || false,
+            borderWidth: element.properties?.borderWidth || 1,
+            borderColor: element.properties?.borderColor || '#000000',
+            borderStyle: element.properties?.borderStyle || 'solid',
+            borderRadius: element.properties?.borderRadius || 0,
+
+            // Shadow properties
+            boxShadow: element.properties?.boxShadow || 'none',
+            textShadow: element.properties?.textShadow || 'none',
+
+            // Image properties
+            imageUrl: element.properties?.imageUrl || '',
+            imageFit: element.properties?.imageFit || 'cover',
+            imagePlaceholder: element.properties?.imagePlaceholder || (element.type === 'image' ? 'Click to upload image' : ''),
+        }
+    }));
+};
+
+// Initialize on mount
+initializeCanvasElements();
+
+// Select element
+const selectElement = (element: CanvasElement) => {
+    selectedElement.value = element;
+};
+
+// Computed properties
+const sortedElements = computed(() => {
+    return [...canvasElements.value].sort((a, b) => a.zIndex - b.zIndex);
+});
+
+const textElements = computed(() => {
+    return canvasElements.value.filter(el => el.type === 'text');
+});
+
+const imageElements = computed(() => {
+    return canvasElements.value.filter(el => el.type === 'image');
+});
+
+// Handle image file upload
+const handleImageUpload = (event: Event, element: CanvasElement) => {
+    const file = (event.target as HTMLInputElement).files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+        alert('Please select a valid image file.');
+        return;
+    }
+
+    // Validate file size (10MB limit)
+    if (file.size > 10 * 1024 * 1024) {
+        alert('File size must be less than 10MB.');
+        return;
+    }
+
+    // Create object URL for preview
+    const imageUrl = URL.createObjectURL(file);
+    element.properties.imageUrl = imageUrl;
+
+    // Store the file for later upload
+    (element as any).uploadedFile = file;
+};
+
+// Remove uploaded image
+const removeImage = (element: CanvasElement) => {
+    // Revoke object URL to free memory
+    if (element.properties.imageUrl && element.properties.imageUrl.startsWith('blob:')) {
+        URL.revokeObjectURL(element.properties.imageUrl);
+    }
+
+    element.properties.imageUrl = '';
+    (element as any).uploadedFile = null;
+};
+
+const renderCanvas = async () => {
+    const canvas = document.getElementById('template-canvas') as HTMLCanvasElement;
+    if (!canvas) return;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    console.log('Rendering canvas with dimensions:', canvas.width, 'x', canvas.height);
+    console.log('Template background:', props.template.background_image);
+    console.log('Elements to render:', sortedElements.value);
+
+    // Clear canvas
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Fill background
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Draw background image if exists
+    if (props.template.background_image) {
+        try {
+            console.log('Loading background image:', `/storage/${props.template.background_image}`);
+            const backgroundImg = new Image();
+            backgroundImg.crossOrigin = 'anonymous';
+            await new Promise((resolve, reject) => {
+                backgroundImg.onload = () => {
+                    console.log('Background image loaded successfully');
+                    resolve(true);
+                };
+                backgroundImg.onerror = (error) => {
+                    console.error('Background image failed to load:', error);
+                    reject(error);
+                };
+                backgroundImg.src = `/storage/${props.template.background_image}`;
+            });
+
+            // Draw background with proper scaling
+            ctx.drawImage(backgroundImg, 0, 0, canvas.width, canvas.height);
+            console.log('Background image drawn to canvas');
+        } catch (error) {
+            console.warn('Failed to load background image:', error);
+        }
+    }
+
+    // Render each element in the correct order (respecting z-index)
+    const elementsToRender = [...sortedElements.value].sort((a, b) => (a.zIndex || 0) - (b.zIndex || 0));
+    console.log('Elements to render (sorted):', elementsToRender);
+
+    for (const element of elementsToRender) {
+        console.log('Rendering element:', element.type, element);
+        if (element.type === 'text') {
+            await renderTextElement(ctx, element);
+        } else if (element.type === 'image') {
+            await renderImageElement(ctx, element);
+        }
+    }
+
+    console.log('Canvas rendering completed');
+};
+
+const renderTextElement = async (ctx: CanvasRenderingContext2D, element: any) => {
+    const { x, y, width, height, properties } = element;
+    const {
+        text,
+        fontSize,
+        color,
+        fontFamily,
+        fontWeight,
+        textAlign,
+        textDecoration,
+        textShadow,
+        backgroundColor,
+        hasBorder,
+        borderWidth,
+        borderColor,
+        borderRadius
+    } = properties;
+
+    if (!text) return;
+
+    // Save context state
+    ctx.save();
+
+    // Draw background if exists
+    if (backgroundColor && backgroundColor !== 'transparent') {
+        ctx.fillStyle = backgroundColor;
+        if (borderRadius > 0) {
+            // Draw rounded rectangle background
+            ctx.beginPath();
+            ctx.roundRect(x, y, width, height, borderRadius);
+            ctx.fill();
+        } else {
+            ctx.fillRect(x, y, width, height);
+        }
+    }
+
+    // Draw border if enabled
+    if (hasBorder && borderWidth > 0) {
+        ctx.strokeStyle = borderColor || '#000000';
+        ctx.lineWidth = borderWidth;
+        if (borderRadius > 0) {
+            ctx.beginPath();
+            ctx.roundRect(x, y, width, height, borderRadius);
+            ctx.stroke();
+        } else {
+            ctx.strokeRect(x, y, width, height);
+        }
+    }
+
+    // Set font properties
+    const fontStyle = properties.fontStyle || 'normal';
+    ctx.font = `${fontStyle} ${fontWeight || 'normal'} ${fontSize}px ${fontFamily || 'Arial'}`;
+    ctx.fillStyle = color || '#000000';
+    ctx.textAlign = (textAlign || 'left') as CanvasTextAlign;
+    ctx.textBaseline = 'middle';
+
+    // Apply text shadow if exists
+    if (textShadow && textShadow !== 'none') {
+        const shadowParts = textShadow.split(' ');
+        if (shadowParts.length >= 3) {
+            ctx.shadowColor = shadowParts[2] || 'rgba(0,0,0,0.5)';
+            ctx.shadowOffsetX = parseInt(shadowParts[0]) || 2;
+            ctx.shadowOffsetY = parseInt(shadowParts[1]) || 2;
+            ctx.shadowBlur = shadowParts[3] ? parseInt(shadowParts[3]) : 4;
+        }
+    }
+
+    // Calculate text position
+    const textX = textAlign === 'center' ? x + width / 2 :
+                  textAlign === 'right' ? x + width - 10 : x + 10;
+    const textY = y + height / 2;
+
+    // Handle text decoration
+    if (textDecoration === 'underline') {
+        ctx.fillText(text, textX, textY);
+        // Draw underline
+        const textMetrics = ctx.measureText(text);
+        ctx.beginPath();
+        ctx.moveTo(textX - textMetrics.width/2, textY + 5);
+        ctx.lineTo(textX + textMetrics.width/2, textY + 5);
+        ctx.stroke();
+    } else {
+        ctx.fillText(text, textX, textY);
+    }
+
+    // Restore context state
+    ctx.restore();
+};
+
+const renderImageElement = async (ctx: CanvasRenderingContext2D, element: any) => {
+    const { x, y, width, height, properties } = element;
+    const {
+        imageUrl,
+        imageFit,
+        borderRadius,
+        hasBorder,
+        borderWidth,
+        borderColor,
+        boxShadow
+    } = properties;
+
+    console.log('Rendering image element:', { x, y, width, height, imageUrl });
+
+    if (!imageUrl || !imageUrl.startsWith('blob:')) {
+        console.log('No valid image URL found:', imageUrl);
+        return;
+    }
+
+    try {
+        console.log('Loading image from URL:', imageUrl);
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        await new Promise((resolve, reject) => {
+            img.onload = () => {
+                console.log('Image loaded successfully, dimensions:', img.width, 'x', img.height);
+                resolve(true);
+            };
+            img.onerror = (error) => {
+                console.error('Image failed to load:', error);
+                reject(error);
+            };
+            img.src = imageUrl;
+        });
+
+        // Save context state
+        ctx.save();
+
+        // Apply box shadow if exists
+        if (boxShadow && boxShadow !== 'none') {
+            const shadowParts = boxShadow.split(' ');
+            if (shadowParts.length >= 3) {
+                ctx.shadowColor = shadowParts[2] || 'rgba(0,0,0,0.3)';
+                ctx.shadowOffsetX = parseInt(shadowParts[0]) || 2;
+                ctx.shadowOffsetY = parseInt(shadowParts[1]) || 2;
+                ctx.shadowBlur = shadowParts[3] ? parseInt(shadowParts[3]) : 4;
+            }
+        }
+
+        // Handle border radius
+        if (borderRadius > 0) {
+            ctx.beginPath();
+            ctx.roundRect(x, y, width, height, borderRadius);
+            ctx.clip();
+        }
+
+        // Draw image with proper fit
+        if (imageFit === 'cover') {
+            // Calculate aspect ratio to fill the area
+            const imgAspect = img.width / img.height;
+            const areaAspect = width / height;
+
+            let drawWidth, drawHeight, drawX, drawY;
+
+            if (imgAspect > areaAspect) {
+                // Image is wider than area
+                drawHeight = height;
+                drawWidth = height * imgAspect;
+                drawX = x - (drawWidth - width) / 2;
+                drawY = y;
+            } else {
+                // Image is taller than area
+                drawWidth = width;
+                drawHeight = width / imgAspect;
+                drawX = x;
+                drawY = y - (drawHeight - height) / 2;
+            }
+
+            console.log('Drawing image with cover fit:', { drawX, drawY, drawWidth, drawHeight });
+            ctx.drawImage(img, drawX, drawY, drawWidth, drawHeight);
+        } else {
+            // Default: stretch to fit
+            console.log('Drawing image with stretch fit:', { x, y, width, height });
+            ctx.drawImage(img, x, y, width, height);
+        }
+
+        // Draw border if enabled
+        if (hasBorder && borderWidth > 0) {
+            ctx.shadowColor = 'transparent'; // Remove shadow for border
+            ctx.strokeStyle = borderColor || '#000000';
+            ctx.lineWidth = borderWidth;
+            if (borderRadius > 0) {
+                ctx.beginPath();
+                ctx.roundRect(x, y, width, height, borderRadius);
+                ctx.stroke();
+            } else {
+                ctx.strokeRect(x, y, width, height);
+            }
+        }
+
+        // Restore context state
+        ctx.restore();
+        console.log('Image element rendered successfully');
+    } catch (error) {
+        console.warn('Failed to render image element:', error);
+    }
+};
+
+const generateImage = async () => {
+    isGenerating.value = true;
+
+    try {
+        // Method 1: Try to capture the HTML preview element directly
+        const previewElement = document.querySelector('.template-preview-container') as HTMLElement;
+        if (previewElement) {
+            try {
+                // Use html2canvas to capture the exact preview
+                const canvas = await html2canvas(previewElement, {
+                    width: props.template.width,
+                    height: props.template.height,
+                    scale: 1,
+                    useCORS: true,
+                    allowTaint: true,
+                    backgroundColor: '#ffffff',
+                    logging: false
+                });
+
+                const blob = await new Promise<Blob>((resolve, reject) => {
+                    canvas.toBlob((blob: Blob | null) => {
+                        if (blob) {
+                            resolve(blob);
+                        } else {
+                            reject(new Error('Failed to convert canvas to blob'));
+                        }
+                    }, 'image/png', 1.0);
+                });
+
+                // Create download link
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = `${props.template.name}.png`;
+                link.click();
+
+                // Clean up
+                URL.revokeObjectURL(url);
+
+                alert('Image generated successfully! Download should start automatically.');
+                return;
+            } catch (error) {
+                console.warn('html2canvas failed, falling back to canvas rendering:', error);
+            }
+        }
+
+        // Method 2: Fallback to canvas rendering
+        await renderCanvas();
+
+        // Capture the canvas as an image
+        const canvas = document.getElementById('template-canvas') as HTMLCanvasElement;
+        if (!canvas) {
+            throw new Error('Canvas not found');
+        }
+
+        // Convert canvas to blob
+        const blob = await new Promise<Blob>((resolve, reject) => {
+            canvas.toBlob((blob) => {
+                if (blob) {
+                    resolve(blob);
+                } else {
+                    reject(new Error('Failed to convert canvas to blob'));
+                }
+            }, 'image/png', 1.0);
+        });
+
+        // Create download link
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `${props.template.name}.png`;
+        link.click();
+
+        // Clean up
+        URL.revokeObjectURL(url);
+
+        // Show success message
+        alert('Image generated successfully! Download should start automatically.');
+
+    } catch (error) {
+        console.error('Error generating image:', error);
+        alert(`Error generating image: ${error.message || 'Unknown error'}`);
+    } finally {
+        isGenerating.value = false;
+    }
+};
+</script>
+
+<template>
+    <Head :title="template.name" />
+
+    <div class="min-h-screen bg-gray-50 dark:bg-gray-900">
+        <!-- Header -->
+        <div class="border-b border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800">
+            <div class="mx-auto max-w-7xl px-4 py-4 sm:px-6 lg:px-8">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ template.name }}</h1>
+                        <p v-if="template.description" class="text-gray-600 dark:text-gray-400">
+                            {{ template.description }}
+                        </p>
+                        <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                            Upload your images and customize the text content
+                        </p>
+                    </div>
+                    <button
+                        @click="generateImage"
+                        :disabled="isGenerating"
+                        class="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+                    >
+                        <Download class="h-4 w-4" />
+                        {{ isGenerating ? 'Generating...' : 'Download Image' }}
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+            <div class="grid gap-6 lg:grid-cols-4">
+                <!-- Left Sidebar - Content Upload -->
+                <div class="lg:col-span-1">
+                    <div class="space-y-4">
+                        <!-- Text Content -->
+                        <div v-if="textElements.length > 0" class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
+                            <div class="p-4 border-b border-gray-200 dark:border-gray-700">
+                                <h2 class="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                                    <Type class="h-5 w-5" />
+                                    Text Content
+                                </h2>
+                            </div>
+                            <div class="p-4 space-y-4">
+                                <div
+                                    v-for="(element, index) in textElements"
+                                    :key="element.id"
+                                    class="space-y-2"
+                                >
+                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                                        Text {{ index + 1 }}
+                                    </label>
+                                    <textarea
+                                        v-model="element.properties.text"
+                                        rows="2"
+                                        class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white transition-colors text-sm"
+                                        :placeholder="`Enter text ${index + 1}`"
+                                    ></textarea>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Image Upload -->
+                        <div v-if="imageElements.length > 0" class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
+                            <div class="p-4 border-b border-gray-200 dark:border-gray-700">
+                                <h2 class="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                                    <Image class="h-5 w-5" />
+                                    Image Upload
+                                </h2>
+                            </div>
+                            <div class="p-4 space-y-4">
+                                <div
+                                    v-for="(element, index) in imageElements"
+                                    :key="element.id"
+                                    class="space-y-2"
+                                >
+                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                                        Image {{ index + 1 }}
+                                    </label>
+                                    <div class="space-y-2">
+                                        <!-- File Upload Input -->
+                                        <input
+                                            :id="`image-${element.id}`"
+                                            type="file"
+                                            accept="image/*"
+                                            @change="handleImageUpload($event, element)"
+                                            class="hidden"
+                                        />
+                                        <label
+                                            :for="`image-${element.id}`"
+                                            class="flex flex-col items-center justify-center w-full h-32 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 dark:hover:bg-bray-800 dark:bg-gray-700 hover:bg-gray-100 dark:border-gray-600 dark:hover:border-gray-500 dark:hover:bg-gray-600"
+                                        >
+                                            <div class="flex flex-col items-center justify-center pt-5 pb-6">
+                                                <Upload class="w-8 h-8 mb-4 text-gray-500 dark:text-gray-400" />
+                                                <p class="mb-2 text-sm text-gray-500 dark:text-gray-400">
+                                                    <span class="font-semibold">Click to upload</span> or drag and drop
+                                                </p>
+                                                <p class="text-xs text-gray-500 dark:text-gray-400">PNG, JPG, GIF up to 10MB</p>
+                                            </div>
+                                        </label>
+
+                                        <!-- Image Preview -->
+                                        <div v-if="element.properties.imageUrl" class="mt-2">
+                                            <img
+                                                :src="element.properties.imageUrl"
+                                                :alt="`Image ${index + 1}`"
+                                                class="w-full h-24 object-cover rounded-lg border border-gray-300 dark:border-gray-600"
+                                            />
+                                            <button
+                                                type="button"
+                                                @click="removeImage(element)"
+                                                class="mt-1 text-xs text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300"
+                                            >
+                                                Remove image
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- No Content Message -->
+                        <div v-if="textElements.length === 0 && imageElements.length === 0" class="bg-yellow-50 dark:bg-yellow-900/20 rounded-xl border border-yellow-200 dark:border-yellow-800">
+                            <div class="p-4">
+                                <h3 class="text-sm font-medium text-yellow-900 dark:text-yellow-100 mb-2">
+                                    No content fields found
+                                </h3>
+                                <p class="text-xs text-yellow-800 dark:text-yellow-200">
+                                    This template doesn't have any text or image placeholders yet. The template creator needs to add content fields first.
+                                </p>
+                            </div>
+                        </div>
+
+                        <!-- Instructions -->
+                        <div class="bg-blue-50 dark:bg-blue-900/20 rounded-xl border border-blue-200 dark:border-blue-800">
+                            <div class="p-4">
+                                <h3 class="text-sm font-medium text-blue-900 dark:text-blue-100 mb-2">
+                                    How to use this template:
+                                </h3>
+                                <ul class="text-xs text-blue-800 dark:text-blue-200 space-y-1">
+                                    <li>• Fill in the text fields with your content</li>
+                                    <li>• Upload images by clicking the upload areas</li>
+                                    <li>• Click "Download Image" to generate your final image</li>
+                                    <li>• All positioning and styling is already set by the template creator</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Center - Template Preview -->
+                <div class="lg:col-span-3">
+                    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
+                        <div class="p-4 border-b border-gray-200 dark:border-gray-700">
+                            <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Template Preview</h2>
+                        </div>
+                        <div class="p-4">
+                            <!-- Hidden Canvas for Image Generation -->
+                            <canvas
+                                id="template-canvas"
+                                :width="template.width"
+                                :height="template.height"
+                                class="hidden"
+                            ></canvas>
+
+                            <div class="flex items-center justify-center">
+                                <div
+                                    class="template-preview-container relative border-2 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700"
+                                    :style="{
+                                        width: Math.min(template.width, 600) + 'px',
+                                        height: Math.min(template.height, 400) + 'px',
+                                        backgroundImage: template.background_image ? `url(/storage/${template.background_image})` : 'none',
+                                        backgroundSize: 'cover',
+                                        backgroundPosition: 'center',
+                                        backgroundRepeat: 'no-repeat'
+                                    }"
+                                >
+                                    <!-- Canvas Elements -->
+                                    <div
+                                        v-for="element in sortedElements"
+                                        :key="element.id"
+                                        class="absolute"
+                                        :style="{
+                                            left: element.x + 'px',
+                                            top: element.y + 'px',
+                                            width: element.width + 'px',
+                                            height: element.height + 'px',
+                                            zIndex: element.zIndex,
+                                            transform: `rotate(${element.rotation}deg)`,
+                                            filter: element.properties.boxShadow !== 'none' ? `drop-shadow(${element.properties.boxShadow})` : 'none'
+                                        }"
+                                    >
+                                        <!-- Text Element -->
+                                        <div v-if="element.type === 'text'" class="w-full h-full flex items-center justify-center" :style="{
+                                            color: element.properties.color,
+                                            backgroundColor: element.properties.backgroundColor,
+                                            fontSize: element.properties.fontSize + 'px',
+                                            fontFamily: element.properties.fontFamily,
+                                            fontWeight: element.properties.fontWeight,
+                                            fontStyle: element.properties.fontStyle,
+                                            textDecoration: element.properties.textDecoration,
+                                            textAlign: element.properties.textAlign,
+                                            lineHeight: element.properties.lineHeight,
+                                            border: element.properties.hasBorder ? `${element.properties.strokeWidth}px ${element.properties.borderStyle} ${element.properties.strokeColor}` : 'none',
+                                            borderRadius: element.properties.borderRadius + 'px'
+                                        }">
+                                            {{ element.properties.text || 'Your text here' }}
+                                        </div>
+
+                                        <!-- Image Element -->
+                                        <div v-else-if="element.type === 'image'" class="w-full h-full flex items-center justify-center bg-gray-100 dark:bg-gray-600 rounded" :style="{
+                                            border: element.properties.hasBorder ? `${element.properties.strokeWidth}px ${element.properties.borderStyle} ${element.properties.strokeColor}` : 'none',
+                                            borderRadius: element.properties.borderRadius + 'px'
+                                        }">
+                                            <img
+                                                v-if="element.properties.imageUrl"
+                                                :src="element.properties.imageUrl"
+                                                :alt="element.properties.imagePlaceholder"
+                                                class="w-full h-full object-cover rounded"
+                                                :style="{ objectFit: element.properties.imageFit }"
+                                            />
+                                            <div v-else class="flex flex-col items-center justify-center text-gray-500 text-sm text-center p-2">
+                                                <Upload class="h-8 w-8 mb-2" />
+                                                <span>{{ element.properties.imagePlaceholder }}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Template Info Overlay -->
+                                    <div class="absolute top-2 left-2">
+                                        <div class="bg-black bg-opacity-75 text-white px-2 py-1 rounded text-xs">
+                                            {{ template.width }} × {{ template.height }}px
+                                        </div>
+                                    </div>
+
+                                    <!-- Status Indicator -->
+                                    <div class="absolute top-2 right-2">
+                                        <div
+                                            :class="template.background_image ? 'bg-green-500' : 'bg-gray-400'"
+                                            class="w-2 h-2 rounded-full"
+                                        ></div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Template Info -->
+                            <div class="mt-4 text-center">
+                                <div class="inline-flex items-center gap-4 px-4 py-2 bg-gray-100 dark:bg-gray-700 rounded-lg">
+                                    <div class="text-sm">
+                                        <span class="font-medium text-gray-900 dark:text-white">Text Fields:</span>
+                                        <span class="text-gray-600 dark:text-gray-400 ml-1">{{ textElements.length }}</span>
+                                    </div>
+                                    <div class="w-px h-4 bg-gray-300 dark:bg-gray-600"></div>
+                                    <div class="text-sm">
+                                        <span class="font-medium text-gray-900 dark:text-white">Image Fields:</span>
+                                        <span class="text-gray-600 dark:text-gray-400 ml-1">{{ imageElements.length }}</span>
+                                    </div>
+                                    <div class="w-px h-4 bg-gray-300 dark:bg-gray-600"></div>
+                                    <div class="text-sm">
+                                        <span class="font-medium text-gray-900 dark:text-white">Status:</span>
+                                        <span
+                                            :class="template.background_image ? 'text-green-600 dark:text-green-400' : 'text-gray-500 dark:text-gray-400'"
+                                            class="ml-1"
+                                        >
+                                            {{ template.background_image ? 'Ready' : 'No background' }}
+                                        </span>
+                                    </div>
+                                </div>
+                                <div class="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                                    This is a preview of your template. Fill in the content on the left to customize it.
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</template>
