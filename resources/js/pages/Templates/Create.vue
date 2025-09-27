@@ -34,7 +34,7 @@ const form = ref({
 const backgroundImagePreview = ref<string | null>(null);
 
 // Editor state
-const selectedTool = ref('text');
+const selectedTool = ref('select');
 const selectedElement = ref<CanvasElement | null>(null);
 const isDragging = ref(false);
 const dragStart = ref({ x: 0, y: 0 });
@@ -52,6 +52,7 @@ const canvasElements = ref<CanvasElement[]>([]);
 
 // Tool options
 const tools = [
+    { id: 'select', name: 'Select', icon: Move },
     { id: 'text', name: 'Text', icon: Type },
     { id: 'image', name: 'Image', icon: Image },
     { id: 'rectangle', name: 'Rectangle', icon: Square },
@@ -213,11 +214,13 @@ const createElement = (type: string) => {
 
     canvasElements.value.push(element);
     selectedElement.value = element;
+    selectedTool.value = 'select';
 };
 
 // Select element
 const selectElement = (element: CanvasElement) => {
     selectedElement.value = element;
+    selectedTool.value = 'select';
 };
 
 // Delete element
@@ -363,27 +366,31 @@ watch(selectedElement, (newElement) => {
 
 // Canvas interactions
 const handleCanvasClick = (event: MouseEvent) => {
-    if (selectedTool.value === 'text') {
-        createElement('text');
-    } else if (selectedTool.value === 'rectangle') {
-        createElement('rectangle');
-    } else if (selectedTool.value === 'circle') {
-        createElement('circle');
-    } else if (selectedTool.value === 'triangle') {
-        createElement('triangle');
-    } else if (selectedTool.value === 'star') {
-        createElement('star');
-    } else if (selectedTool.value === 'heart') {
-        createElement('heart');
-    } else if (selectedTool.value === 'image') {
-        createElement('image');
-    }
-};
+        if (selectedTool.value !== 'select') {
+            if (selectedTool.value === 'text') {
+                createElement('text');
+            } else if (selectedTool.value === 'rectangle') {
+                createElement('rectangle');
+            } else if (selectedTool.value === 'circle') {
+                createElement('circle');
+            } else if (selectedTool.value === 'triangle') {
+                createElement('triangle');
+            } else if (selectedTool.value === 'star') {
+                createElement('star');
+            } else if (selectedTool.value === 'heart') {
+                createElement('heart');
+            } else if (selectedTool.value === 'image') {
+                createElement('image');
+            }
+        }
+    };
 
 const handleElementMouseDown = (event: MouseEvent, element: CanvasElement) => {
-    selectedElement.value = element;
-    isDragging.value = true;
-    dragStart.value = { x: event.clientX - element.x, y: event.clientY - element.y };
+        selectedElement.value = element;
+        if (selectedTool.value === 'select') {
+            isDragging.value = true;
+            dragStart.value = { x: event.clientX - element.x, y: event.clientY - element.y };
+        }
 };
 
 const handleMouseMove = (event: MouseEvent) => {
@@ -580,11 +587,11 @@ const submitForm = () => {
                                                 v-if="isQuickTemplateDropdownOpen"
                                                 class="absolute z-10 w-full mt-1 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg shadow-lg max-h-60 overflow-auto"
                                             >
-                                                <button
-                                                    v-for="template in quickTemplates"
-                                                    :key="template.name"
-                                                    type="button"
-                                                    @click="applyQuickTemplate(template)"
+                                            <button
+                                                v-for="template in quickTemplates"
+                                                :key="template.name"
+                                                type="button"
+                                                @click="applyQuickTemplate(template)"
                                                     :class="[
                                                         'w-full text-left px-3 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors',
                                                         selectedQuickTemplate?.name === template.name 
@@ -596,7 +603,7 @@ const submitForm = () => {
                                                     <div class="text-xs text-gray-500 dark:text-gray-400">
                                                         {{ template.width }} × {{ template.height }}px
                                                     </div>
-                                                </button>
+                                            </button>
                                             </div>
                                         </div>
                                     </div>
@@ -1144,7 +1151,7 @@ const submitForm = () => {
                                             </label>
                                             <div class="space-y-2">
                                                 <div class="flex items-center space-x-2">
-                                                    <input
+                                            <input
                                                         :checked="selectedElement.properties.backgroundColor === 'transparent'"
                                                         @change="updateSelectedElementProperty('backgroundColor', 'transparent')"
                                                         type="radio"
@@ -1154,10 +1161,10 @@ const submitForm = () => {
                                                     />
                                                     <label for="transparent-bg" class="text-sm font-medium text-gray-700 dark:text-gray-300">
                                                         Transparent
-                                                    </label>
+                                            </label>
                                                 </div>
                                                 <div class="flex items-center space-x-2">
-                                                    <input
+                                            <input
                                                         :checked="selectedElement.properties.backgroundColor !== 'transparent'"
                                                         @change="updateSelectedElementProperty('backgroundColor', '#ffffff')"
                                                         type="radio"
@@ -1167,10 +1174,10 @@ const submitForm = () => {
                                                     />
                                                     <label for="color-bg" class="text-sm font-medium text-gray-700 dark:text-gray-300">
                                                         Background Color
-                                                    </label>
+                                            </label>
                                                 </div>
                                                 <div v-if="selectedElement.properties.backgroundColor !== 'transparent'" class="ml-6">
-                                                    <input
+                                            <input
                                                         :value="selectedElement.properties.backgroundColor"
                                                         @input="updateSelectedElementProperty('backgroundColor', getInputValue($event))"
                                                         type="color"
