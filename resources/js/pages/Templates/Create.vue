@@ -152,7 +152,7 @@ const updateElementProperty = (elementId: string, property: string, value: any) 
         element.properties = { ...element.properties, [property]: value };
         canvasElements.value[elementIndex] = { ...element };
         
-        if (selectedElement.value?.id === elementId) {
+    if (selectedElement.value?.id === elementId) {
             selectedElement.value = { ...element };
         }
     }
@@ -237,6 +237,7 @@ const deleteElement = (elementId: string) => {
     }
 };
 
+
 // Quick template functions
 const applyQuickTemplate = (template: { name: string; width: number; height: number }) => {
     selectedQuickTemplate.value = template;
@@ -259,14 +260,14 @@ const submitForm = async () => {
     }
 
     isSubmitting.value = true;
-    
+
     const formData = new FormData();
     formData.append('name', form.value.name);
     formData.append('description', form.value.description);
     formData.append('width', form.value.width.toString());
     formData.append('height', form.value.height.toString());
     formData.append('canvas_data', JSON.stringify(canvasElements.value));
-    
+
     if (form.value.background_image) {
         formData.append('background_image', form.value.background_image);
     }
@@ -306,7 +307,7 @@ const handleKeydown = (event: KeyboardEvent) => {
     <Head title="Create Template" />
 
     <AppLayout :breadcrumbs="breadcrumbs">
-        <div class="min-h-screen bg-gray-50 dark:bg-gray-900" @click="closeDropdownOnOutsideClick" @keydown="handleKeydown">
+        <div class="h-screen bg-gray-50 dark:bg-gray-900 overflow-hidden" @click="closeDropdownOnOutsideClick" @keydown="handleKeydown">
             <!-- Main Content -->
             <div class="w-full px-4 py-4">
                 <form @submit.prevent="submitForm" class="flex gap-4">

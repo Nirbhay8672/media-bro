@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed , ref } from 'vue';
 import { Upload, Layers, Copy, Trash2 } from 'lucide-vue-next';
 
 interface CanvasElement {
@@ -111,6 +111,7 @@ const duplicateElement = (elementId: string) => {
 const deleteElement = (elementId: string) => {
     emit('deleteElement', elementId);
 };
+
 </script>
 
 <template>
@@ -226,7 +227,7 @@ const deleteElement = (elementId: string) => {
                                     textAlign: element.properties.textAlign || 'left',
                                     lineHeight: String(element.properties.lineHeight || 1.2),
                                     color: element.properties.color || '#000000'
-                                }">
+                                } as any">
                                     {{ element.properties.text || 'Text' }}
                                 </div>
 
@@ -241,7 +242,7 @@ const deleteElement = (elementId: string) => {
                                         :src="element.properties.imageUrl"
                                         :alt="element.properties.text || 'Image'"
                                         class="max-w-full max-h-full"
-                                        :style="{ objectFit: element.properties.imageFit || 'contain' }"
+                                        :style="{ objectFit: element.properties.imageFit || 'contain' } as any"
                                     />
                                     <div v-else class="text-gray-400 text-sm">No Image</div>
                                 </div>
