@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Str;
 
 class Template extends Model
@@ -55,5 +56,15 @@ class Template extends Model
     public function getShareUrlAttribute(): string
     {
         return route('template.share', $this->share_token);
+    }
+
+    public function visits(): HasMany
+    {
+        return $this->hasMany(TemplateVisit::class);
+    }
+
+    public function downloads(): HasMany
+    {
+        return $this->hasMany(TemplateDownload::class);
     }
 }

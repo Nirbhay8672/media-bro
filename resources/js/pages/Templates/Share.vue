@@ -293,6 +293,31 @@ const generateImage = async () => {
         link.click();
         document.body.removeChild(link);
 
+        // Track the download
+        try {
+            console.log('Tracking download for template:', props.template.share_token);
+            const response = await fetch(`/template/${props.template.share_token}/track-download`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+                    'Accept': 'application/json'
+                },
+                body: JSON.stringify({
+                    file_name: `${props.template.name}.png`,
+                    file_size: dataUrl.length // Approximate file size
+                })
+            });
+            
+            if (response.ok) {
+                console.log('Download tracked successfully');
+            } else {
+                console.error('Failed to track download:', response.status, response.statusText);
+            }
+    } catch (error) {
+            console.error('Failed to track download:', error);
+        }
+
         // Close loading and show success
         Swal.close();
         Swal.fire({

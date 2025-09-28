@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Template;
+use App\Services\VisitorTrackingService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
@@ -12,6 +13,13 @@ use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 class TemplateController extends Controller
 {
     use AuthorizesRequests;
+
+    protected $visitorTrackingService;
+
+    public function __construct(VisitorTrackingService $visitorTrackingService)
+    {
+        $this->visitorTrackingService = $visitorTrackingService;
+    }
     /**
      * Display a listing of the resource.
      */
@@ -177,11 +185,14 @@ class TemplateController extends Controller
     /**
      * Show public template for editing
      */
-    public function share($token)
+    public function share(Request $request, $token)
     {
         $template = Template::where('share_token', $token)
             ->where('is_active', true)
             ->firstOrFail();
+
+        // Track the visit
+        $this->visitorTrackingService->trackVisit($template, $request);
 
         return Inertia::render('Templates/Share', [
             'template' => $template
@@ -364,6 +375,51 @@ class TemplateController extends Controller
             imagedestroy($resizedImage);
         } catch (\Exception $e) {
             Log::error('Failed to process uploaded image: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Track download
+     */
+    public function trackDownload(Request $request, $token)
+    {
+        Log::info('Download tracking request received', [
+            'token' => $token,
+            'request_data' => $request->all(),
+            'ip' => $request->ip()
+        ]);
+
+        $template = Template::where('share_token', $token)
+            ->where('is_active', true)
+            ->firstOrFail();
+
+        $request->validate([
+            'file_name' => 'required|string|max:255',
+            'file_size' => 'nullable|integer|min:0'
+        ]);
+
+        try {
+            // Track the download
+            $this->visitorTrackingService->trackDownload(
+                $template, 
+                $request, 
+                $request->file_name,
+                $request->file_size
+            );
+
+            Log::info('Download tracked successfully', [
+                'template_id' => $template->id,
+                'file_name' => $request->file_name
+            ]);
+
+            return response()->json(['success' => true]);
+        } catch (\Exception $e) {
+            Log::error('Failed to track download', [
+                'template_id' => $template->id,
+                'error' => $e->getMessage()
+            ]);
+
+            return response()->json(['success' => false, 'error' => $e->getMessage()], 500);
         }
     }
 

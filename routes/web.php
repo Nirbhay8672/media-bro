@@ -1,6 +1,7 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\Schema;
 use Inertia\Inertia;
 use App\Http\Controllers\TemplateController;
 use App\Http\Controllers\UserController;
@@ -30,6 +31,7 @@ Route::get('/', function () {
 
 // Public template sharing
 Route::get('template/{token}', [TemplateController::class, 'share'])->name('template.share');
+Route::post('template/{token}/track-download', [TemplateController::class, 'trackDownload'])->name('template.track-download');
 
 // ============================================================================
 // AUTHENTICATED ROUTES
@@ -98,6 +100,25 @@ Route::get('debug-image', function () {
         return response()->file(storage_path('app/public/' . $template->background_image));
     }
     return 'No template found';
+});
+
+// Debug route for testing tracking
+Route::get('debug-tracking', function () {
+    try {
+        // Check if tables exist
+        $visitsTable = \Schema::hasTable('template_visits');
+        $downloadsTable = \Schema::hasTable('template_downloads');
+        
+        return response()->json([
+            'visits_table_exists' => $visitsTable,
+            'downloads_table_exists' => $downloadsTable,
+            'templates_count' => \App\Models\Template::count(),
+            'visits_count' => $visitsTable ? \App\Models\TemplateVisit::count() : 'N/A',
+            'downloads_count' => $downloadsTable ? \App\Models\TemplateDownload::count() : 'N/A'
+        ]);
+    } catch (\Exception $e) {
+        return response()->json(['error' => $e->getMessage()]);
+    }
 });
 
 // ============================================================================
