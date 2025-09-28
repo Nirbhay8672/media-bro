@@ -27,20 +27,28 @@ interface Emits {
 const props = defineProps<Props>();
 const emit = defineEmits<Emits>();
 
-// Quick templates
+// Removed search functionality for simplified dropdown
+
+// Quick templates - simplified to 4 essential options
 const quickTemplates = [
-    { name: 'Social Media Post', width: 1080, height: 1080 },
+    { name: 'Instagram Post', width: 1080, height: 1080 },
     { name: 'Instagram Story', width: 1080, height: 1920 },
-    { name: 'Facebook Cover', width: 1200, height: 630 },
-    { name: 'Twitter Header', width: 1500, height: 500 },
-    { name: 'YouTube Thumbnail', width: 1280, height: 720 },
-    { name: 'Business Card', width: 1050, height: 600 },
-    { name: 'A4 Document', width: 2480, height: 3508 },
-    { name: 'Custom', width: 800, height: 600 }
+    { name: 'Facebook Post', width: 1200, height: 630 },
+    { name: 'Custom Size', width: 800, height: 600 }
 ];
 
+// No need for filtering or grouping with only 4 options
+
 const updateForm = (field: string, value: any) => {
-    emit('update:form', { ...props.form, [field]: value });
+    // Validate width and height
+    if (field === 'width' || field === 'height') {
+        const numValue = parseInt(value) || 100;
+        // Ensure minimum size of 100px and maximum of 4000px
+        const clampedValue = Math.max(100, Math.min(4000, numValue));
+        emit('update:form', { ...props.form, [field]: clampedValue });
+    } else {
+        emit('update:form', { ...props.form, [field]: value });
+    }
 };
 
 const handleBackgroundImageChange = (event: Event) => {
@@ -135,14 +143,14 @@ const handleKeydown = (event: KeyboardEvent) => {
                         </button>
                         <div
                             v-if="isQuickTemplateDropdownOpen"
-                            class="absolute z-10 w-full mt-1 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg shadow-lg max-h-60 overflow-auto"
+                            class="absolute z-10 w-full mt-1 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg shadow-lg"
                         >
                             <button
                                 v-for="template in quickTemplates"
                                 :key="template.name"
                                 type="button"
                                 @click="applyQuickTemplate(template)"
-                                class="w-full px-3 py-2 text-left hover:bg-gray-100 dark:hover:bg-gray-600 text-sm"
+                                class="w-full px-3 py-2 text-left hover:bg-gray-100 dark:hover:bg-gray-600 text-sm first:rounded-t-lg last:rounded-b-lg"
                             >
                                 <div class="font-medium">{{ template.name }}</div>
                                 <div class="text-xs text-gray-500 dark:text-gray-400">
@@ -165,9 +173,11 @@ const handleKeydown = (event: KeyboardEvent) => {
                             </label>
                             <input
                                 :value="form.width"
-                                @input="updateForm('width', parseInt(($event.target as HTMLInputElement).value) || 100)"
+                                @input="updateForm('width', ($event.target as HTMLInputElement).value)"
                                 type="number"
                                 min="100"
+                                max="4000"
+                                step="1"
                                 class="w-full px-2 py-1 border border-gray-300 dark:border-gray-600 rounded text-sm focus:ring-1 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
                             />
                         </div>
@@ -177,9 +187,11 @@ const handleKeydown = (event: KeyboardEvent) => {
                             </label>
                             <input
                                 :value="form.height"
-                                @input="updateForm('height', parseInt(($event.target as HTMLInputElement).value) || 100)"
+                                @input="updateForm('height', ($event.target as HTMLInputElement).value)"
                                 type="number"
                                 min="100"
+                                max="4000"
+                                step="1"
                                 class="w-full px-2 py-1 border border-gray-300 dark:border-gray-600 rounded text-sm focus:ring-1 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
                             />
                         </div>

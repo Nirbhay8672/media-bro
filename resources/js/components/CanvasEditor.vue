@@ -65,14 +65,25 @@ interface Emits {
 const props = defineProps<Props>();
 const emit = defineEmits<Emits>();
 
-const canvasStyle = computed(() => ({
-    width: Math.min(props.form.width, 600) + 'px',
-    height: Math.min(props.form.height, 400) + 'px',
-    backgroundImage: props.backgroundImagePreview ? `url(${props.backgroundImagePreview})` : 'none',
-    backgroundSize: 'cover',
-    backgroundPosition: 'center',
-    backgroundRepeat: 'no-repeat'
-}));
+const canvasStyle = computed(() => {
+    // Calculate scale to fit within viewport while maintaining aspect ratio
+    const maxWidth = 800;
+    const maxHeight = 600;
+    const scaleX = maxWidth / props.form.width;
+    const scaleY = maxHeight / props.form.height;
+    const scale = Math.min(scaleX, scaleY, 1); // Don't scale up
+    
+    return {
+        width: props.form.width + 'px',
+        height: props.form.height + 'px',
+        transform: `scale(${scale})`,
+        transformOrigin: 'top center',
+        backgroundImage: props.backgroundImagePreview ? `url(${props.backgroundImagePreview})` : 'none',
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat'
+    };
+});
 
 const sortedElements = computed(() => {
     return [...props.canvasElements].sort((a, b) => a.zIndex - b.zIndex);
@@ -214,7 +225,7 @@ const getImageClipPath = (shape: string) => {
 
 <template>
     <div class="flex-1 min-w-0">
-        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 flex flex-col">
             <!-- Canvas Editor Header -->
             <div class="pt-5 px-4 pb-2 border-b border-gray-200 dark:border-gray-700">
                 <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Template Editor</h2>
@@ -267,9 +278,8 @@ const getImageClipPath = (shape: string) => {
                 </div>
             </div>
 
-            <div class="p-4">
-                <div class="flex justify-center w-full">
-                    <div class="relative">
+            <div class="p-4 flex justify-center items-start min-h-[400px]">
+                <div class="relative" style="margin: 20px 0;">
                         <!-- Canvas -->
                         <div
                             class="relative overflow-hidden border-2 border-gray-300 bg-gray-50 dark:border-gray-600 dark:bg-gray-700 shadow-lg rounded-lg cursor-crosshair"
@@ -388,35 +398,7 @@ const getImageClipPath = (shape: string) => {
                     </div>
                 </div>
             </div>
-
-            <!-- Status Bar -->
-            <div class="px-4 py-2 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700">
-                <div class="flex items-center justify-between text-sm">
-                    <div class="flex items-center gap-4">
-                        <div>
-                            <span class="font-medium text-gray-900 dark:text-white">Elements:</span>
-                            <span class="text-blue-600 dark:text-blue-400 ml-1">{{ canvasElements.length }}</span>
-                        </div>
-                        <div class="w-px h-4 bg-gray-300 dark:bg-gray-600"></div>
-                        <div class="text-sm">
-                            <span class="font-medium text-gray-900 dark:text-white">Status:</span>
-                            <span class="text-green-600 dark:text-green-400 ml-1">
-                                {{ backgroundImagePreview ? 'Ready' : 'No background' }}
-                            </span>
-                        </div>
-                        <div class="w-px h-4 bg-gray-300 dark:bg-gray-600"></div>
-                        <div class="text-sm">
-                            <span class="font-medium text-gray-900 dark:text-white">Mode:</span>
-                            <span class="text-blue-600 dark:text-blue-400 ml-1">Draft</span>
-                        </div>
-                    </div>
-                </div>
-                <div class="mt-2 text-xs text-gray-500 dark:text-gray-400">
-                    Elements are in draft mode. They will be saved when you create the template.
-                </div>
-            </div>
         </div>
-    </div>
 </template>
 
 <style scoped>
