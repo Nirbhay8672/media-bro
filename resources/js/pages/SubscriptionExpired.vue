@@ -30,18 +30,12 @@
                     </div>
                 </div>
                 
-                <div class="flex flex-col sm:flex-row gap-3">
+                <div class="flex justify-center">
                     <button 
                         @click="logout" 
-                        class="flex-1 bg-red-500 hover:bg-red-600 text-white font-medium py-2 px-4 rounded-lg transition-colors"
+                        class="bg-red-500 hover:bg-red-600 text-white font-medium py-3 px-8 rounded-lg transition-colors"
                     >
                         Logout
-                    </button>
-                    <button 
-                        @click="goHome" 
-                        class="flex-1 bg-gray-500 hover:bg-gray-600 text-white font-medium py-2 px-4 rounded-lg transition-colors"
-                    >
-                        Go Home
                     </button>
                 </div>
             </div>
@@ -51,7 +45,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import { usePage } from '@inertiajs/vue3'
+import { usePage, router } from '@inertiajs/vue3'
 
 const page = usePage()
 const user = computed(() => page.props.auth?.user)
@@ -65,13 +59,8 @@ const formatDate = (dateString: string) => {
 }
 
 const logout = () => {
-    // Redirect to logout
-    window.location.href = '/logout'
-}
-
-const goHome = () => {
-    // Redirect to home
-    window.location.href = '/'
+    // Use POST method for logout
+    router.post('/logout')
 }
 </script>
 
