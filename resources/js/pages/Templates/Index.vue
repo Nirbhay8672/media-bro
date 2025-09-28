@@ -4,10 +4,8 @@ import { Head, Link, router } from '@inertiajs/vue3';
 import { dashboard } from '@/routes';
 import templates from '@/routes/templates/index';
 import { type BreadcrumbItem } from '@/types';
-import { Plus, Edit, Trash2, Eye, Share2, Copy } from 'lucide-vue-next';
+import { Plus, Edit, Trash2, Share2, Copy } from 'lucide-vue-next';
 import Swal from 'sweetalert2';
-import ViewTemplateModal from '@/components/modals/template/ViewTemplateModal.vue';
-import { ref } from 'vue';
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
@@ -74,9 +72,6 @@ const props = defineProps<{
     templates: Template[];
 }>();
 
-// Modal state
-const showViewModal = ref(false);
-const selectedTemplate = ref<Template | null>(null);
 
 
 const deleteTemplate = (id: number) => {
@@ -129,35 +124,64 @@ const getTemplateEditUrl = (templateId: number) => {
 
 const copyShareLink = (shareToken: string) => {
     const shareUrl = `${window.location.origin}/template/${shareToken}`;
-    navigator.clipboard.writeText(shareUrl).then(() => {
-        Swal.fire({
-            title: 'Copied!',
-            text: 'Share link copied to clipboard!',
-            icon: 'success',
-            confirmButtonText: 'OK',
-            timer: 2000,
-            timerProgressBar: true
+    
+    // Modern clipboard API
+    if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(shareUrl).then(() => {
+            showCopySuccess();
+        }).catch(() => {
+            fallbackCopyText(shareUrl);
         });
-    }).catch(() => {
-        Swal.fire({
-            title: 'Error!',
-            text: 'Failed to copy link. Please try again.',
-            icon: 'error',
-            confirmButtonText: 'OK'
-        });
+    } else {
+        // Fallback for older browsers or non-HTTPS
+        fallbackCopyText(shareUrl);
+    }
+};
+
+const fallbackCopyText = (text: string) => {
+    const textArea = document.createElement('textarea');
+    textArea.value = text;
+    textArea.style.position = 'fixed';
+    textArea.style.left = '-999999px';
+    textArea.style.top = '-999999px';
+    document.body.appendChild(textArea);
+    textArea.focus();
+    textArea.select();
+    
+    try {
+        const successful = document.execCommand('copy');
+        if (successful) {
+            showCopySuccess();
+        } else {
+            showCopyError();
+        }
+    } catch (err) {
+        showCopyError();
+    } finally {
+        document.body.removeChild(textArea);
+    }
+};
+
+const showCopySuccess = () => {
+    Swal.fire({
+        title: 'Copied!',
+        text: 'Share link copied to clipboard!',
+        icon: 'success',
+        confirmButtonText: 'OK',
+        timer: 2000,
+        timerProgressBar: true
     });
 };
 
-// Modal functions
-const openViewModal = (template: Template) => {
-    selectedTemplate.value = template;
-    showViewModal.value = true;
+const showCopyError = () => {
+    Swal.fire({
+        title: 'Error!',
+        text: 'Failed to copy link. Please try again.',
+        icon: 'error',
+        confirmButtonText: 'OK'
+    });
 };
 
-const closeModals = () => {
-    showViewModal.value = false;
-    selectedTemplate.value = null;
-};
 </script>
 
 <template>
@@ -257,13 +281,6 @@ const closeModals = () => {
 
                         <!-- Action Buttons -->
                         <div class="flex gap-2">
-                            <button
-                                @click="openViewModal(template)"
-                                class="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
-                            >
-                                <Eye class="h-4 w-4" />
-                                View
-                            </button>
                             <Link
                                 v-if="template.id"
                                 :href="getTemplateEditUrl(template.id)"
@@ -296,11 +313,5 @@ const closeModals = () => {
             </div>
         </div>
 
-        <!-- View Template Modal -->
-        <ViewTemplateModal
-            :is-open="showViewModal"
-            :template="selectedTemplate"
-            @close="closeModals"
-        />
     </AppLayout>
 </template>
