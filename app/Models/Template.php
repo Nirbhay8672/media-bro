@@ -25,6 +25,17 @@ class Template extends Model
         'is_active' => 'boolean',
     ];
 
+    /**
+     * Get the canvas_data attribute
+     */
+    public function getCanvasDataAttribute($value)
+    {
+        if (is_string($value)) {
+            return json_decode($value, true) ?? [];
+        }
+        return $value ?? [];
+    }
+
     protected static function boot()
     {
         parent::boot();

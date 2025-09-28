@@ -316,6 +316,11 @@ const submitForm = async () => {
     formData.append('description', form.value.description);
     formData.append('width', form.value.width.toString());
     formData.append('height', form.value.height.toString());
+    
+    // Debug logging
+    console.log('Canvas elements being sent:', canvasElements.value);
+    console.log('Canvas dimensions:', { width: form.value.width, height: form.value.height });
+    
     formData.append('canvas_data', JSON.stringify(canvasElements.value));
 
     if (form.value.background_image) {

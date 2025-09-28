@@ -52,7 +52,22 @@ class TemplateController extends Controller
         $template->description = $request->description;
         $template->width = $request->width;
         $template->height = $request->height;
-        $template->canvas_data = $request->canvas_data ?? [];
+        
+        // Parse canvas_data if it's a JSON string
+        $canvasData = $request->canvas_data ?? [];
+        if (is_string($canvasData)) {
+            $canvasData = json_decode($canvasData, true) ?? [];
+        }
+        
+        // Debug logging
+        Log::info('Canvas data being saved:', [
+            'raw' => $request->canvas_data,
+            'parsed' => $canvasData,
+            'width' => $request->width,
+            'height' => $request->height
+        ]);
+        
+        $template->canvas_data = $canvasData;
         $template->user_id = auth()->id();
 
         if ($request->hasFile('background_image')) {
@@ -107,7 +122,15 @@ class TemplateController extends Controller
         $template->description = $request->description;
         $template->width = $request->width;
         $template->height = $request->height;
-        $template->canvas_data = $request->canvas_data ?? $template->canvas_data;
+        
+        // Parse canvas_data if it's a JSON string
+        if ($request->has('canvas_data')) {
+            $canvasData = $request->canvas_data;
+            if (is_string($canvasData)) {
+                $canvasData = json_decode($canvasData, true) ?? [];
+            }
+            $template->canvas_data = $canvasData;
+        }
 
         if ($request->hasFile('background_image')) {
             // Delete old background image
