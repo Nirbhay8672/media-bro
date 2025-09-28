@@ -757,7 +757,7 @@ const generateImage = async () => {
                                         :style="canvasStyle"
                                         @mousemove="handleMouseMove"
                                         @mouseup="handleMouseUp"
-                                    >
+                                >
                                     <!-- Canvas Elements -->
                                     <div
                                         v-for="element in sortedElements"
@@ -778,17 +778,17 @@ const generateImage = async () => {
                                             v-if="element.type === 'text'" 
                                             class="w-full h-full flex items-center justify-center cursor-move select-none" 
                                             :style="{
-                                                color: element.properties.color,
-                                                backgroundColor: element.properties.backgroundColor,
-                                                fontSize: element.properties.fontSize + 'px',
-                                                fontFamily: element.properties.fontFamily,
-                                                fontWeight: element.properties.fontWeight,
-                                                fontStyle: element.properties.fontStyle,
-                                                textDecoration: element.properties.textDecoration,
-                                                textAlign: element.properties.textAlign,
-                                                lineHeight: element.properties.lineHeight,
-                                                border: element.properties.hasBorder ? `${element.properties.strokeWidth}px ${element.properties.borderStyle} ${element.properties.strokeColor}` : 'none',
-                                                borderRadius: element.properties.borderRadius + 'px'
+                                            color: element.properties.color,
+                                            backgroundColor: element.properties.backgroundColor,
+                                            fontSize: element.properties.fontSize + 'px',
+                                            fontFamily: element.properties.fontFamily,
+                                            fontWeight: element.properties.fontWeight,
+                                            fontStyle: element.properties.fontStyle,
+                                            textDecoration: element.properties.textDecoration,
+                                            textAlign: element.properties.textAlign,
+                                            lineHeight: element.properties.lineHeight,
+                                            border: element.properties.hasBorder ? `${element.properties.strokeWidth}px ${element.properties.borderStyle} ${element.properties.strokeColor}` : 'none',
+                                            borderRadius: element.properties.borderRadius + 'px'
                                             }"
                                             @mousedown="handleElementMouseDown($event, element)"
                                         >
@@ -796,7 +796,8 @@ const generateImage = async () => {
                                         </div>
 
                                         <!-- Image Element -->
-                                        <div v-else-if="element.type === 'image'" class="w-full h-full flex items-center justify-center bg-gray-100 dark:bg-gray-600 rounded" :style="{
+                                        <div v-else-if="element.type === 'image'" class="w-full h-full flex items-center justify-center" :style="{
+                                            backgroundColor: element.properties.backgroundColor || 'transparent',
                                             border: element.properties.hasBorder ? `${element.properties.strokeWidth}px ${element.properties.borderStyle} ${element.properties.strokeColor}` : 'none',
                                             borderRadius: element.properties.borderRadius + 'px',
                                             clipPath: getImageClipPath(element.properties.imageShape || 'rectangle')
@@ -805,8 +806,8 @@ const generateImage = async () => {
                                                 v-if="element.properties.imageUrl"
                                                 :src="element.properties.imageUrl"
                                                 :alt="element.properties.imagePlaceholder"
-                                                class="w-full h-full object-cover rounded"
-                                                :style="{ objectFit: element.properties.imageFit }"
+                                                class="max-w-full max-h-full"
+                                                :style="{ objectFit: element.properties.imageFit || 'contain' }"
                                             />
                                             <div v-else class="flex flex-col items-center justify-center text-gray-500 text-sm text-center p-2">
                                                 <Upload class="h-8 w-8 mb-2" />
