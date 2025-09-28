@@ -140,6 +140,26 @@ const imageElements = computed(() => {
     return canvasElements.value.filter(el => el.type === 'image');
 });
 
+const canvasStyle = computed(() => {
+    // Calculate scale to fit within viewport while maintaining aspect ratio
+    const maxWidth = 800;
+    const maxHeight = 600;
+    const scaleX = maxWidth / props.template.width;
+    const scaleY = maxHeight / props.template.height;
+    const scale = Math.min(scaleX, scaleY, 1); // Don't scale up
+    
+    return {
+        width: props.template.width + 'px',
+        height: props.template.height + 'px',
+        transform: `scale(${scale})`,
+        transformOrigin: 'top center',
+        backgroundImage: props.template.background_image ? `url(/storage/${props.template.background_image})` : 'none',
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat'
+    };
+});
+
 
 const handleImageUpload = (event: Event, element: CanvasElement) => {
     const file = (event.target as HTMLInputElement).files?.[0];
@@ -680,18 +700,12 @@ const generateImage = async () => {
                                 class="hidden"
                             ></canvas>
 
-                            <div class="flex items-center justify-center">
-                                <div
-                                    class="template-preview-container relative border-2 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700"
-                                    :style="{
-                                        width: Math.min(template.width, 600) + 'px',
-                                        height: Math.min(template.height, 400) + 'px',
-                                        backgroundImage: template.background_image ? `url(/storage/${template.background_image})` : 'none',
-                                        backgroundSize: 'cover',
-                                        backgroundPosition: 'center',
-                                        backgroundRepeat: 'no-repeat'
-                                    }"
-                                >
+                            <div class="flex justify-center items-start min-h-[400px]">
+                                <div class="relative" style="margin: 20px 0;">
+                                    <div
+                                        class="template-preview-container relative overflow-hidden border-2 border-gray-300 bg-gray-50 dark:border-gray-600 dark:bg-gray-700 shadow-lg rounded-lg"
+                                        :style="canvasStyle"
+                                    >
                                     <!-- Canvas Elements -->
                                     <div
                                         v-for="element in sortedElements"
@@ -741,6 +755,33 @@ const generateImage = async () => {
                                                 <span>{{ element.properties.imagePlaceholder }}</span>
                                             </div>
                                         </div>
+
+                                        <!-- Rectangle Element -->
+                                        <div v-else-if="element.type === 'rectangle'" class="w-full h-full" :style="{
+                                            backgroundColor: element.properties.fillColor,
+                                            border: element.properties.hasBorder ? `${element.properties.strokeWidth}px ${element.properties.borderStyle} ${element.properties.strokeColor}` : 'none',
+                                            borderRadius: (element.properties.borderRadius || 0) + 'px'
+                                        }"></div>
+
+                                        <!-- Circle Element -->
+                                        <div v-else-if="element.type === 'circle'" class="w-full h-full rounded-full" :style="{
+                                            backgroundColor: element.properties.fillColor,
+                                            border: element.properties.hasBorder ? `${element.properties.strokeWidth}px ${element.properties.borderStyle} ${element.properties.strokeColor}` : 'none'
+                                        }"></div>
+
+                                        <!-- Triangle Element -->
+                                        <div v-else-if="element.type === 'triangle'" class="w-full h-full" :style="{
+                                            backgroundColor: element.properties.fillColor,
+                                            border: element.properties.hasBorder ? `${element.properties.strokeWidth}px ${element.properties.borderStyle} ${element.properties.strokeColor}` : 'none',
+                                            clipPath: 'polygon(50% 0%, 0% 100%, 100% 100%)'
+                                        }"></div>
+
+                                        <!-- Star Element -->
+                                        <div v-else-if="element.type === 'star'" class="w-full h-full" :style="{
+                                            backgroundColor: element.properties.fillColor,
+                                            border: element.properties.hasBorder ? `${element.properties.strokeWidth}px ${element.properties.borderStyle} ${element.properties.strokeColor}` : 'none',
+                                            clipPath: 'polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%)'
+                                        }"                                        ></div>
                                     </div>
 
                                     <!-- Template Info Overlay -->
@@ -756,6 +797,7 @@ const generateImage = async () => {
                                             :class="template.background_image ? 'bg-green-500' : 'bg-gray-400'"
                                             class="w-2 h-2 rounded-full"
                                         ></div>
+                                    </div>
                                     </div>
                                 </div>
                             </div>
