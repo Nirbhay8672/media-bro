@@ -2,7 +2,7 @@
 import { Head } from '@inertiajs/vue3';
 import { Download, Type, Image, Upload } from 'lucide-vue-next';
 import { ref, computed } from 'vue';
-import html2canvas from 'html2canvas';
+import * as domtoimage from 'dom-to-image';
 
 interface Template {
     id: number;
@@ -246,338 +246,42 @@ const removeImage = (element: CanvasElement) => {
     (element as any).uploadedFile = null;
 };
 
-const renderCanvas = async () => {
-    const canvas = document.getElementById('template-canvas') as HTMLCanvasElement;
-    if (!canvas) return;
-
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-
-    
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-    
-    if (props.template.background_image) {
-        try {
-            const backgroundImg = new Image();
-            backgroundImg.crossOrigin = 'anonymous';
-            await new Promise((resolve, reject) => {
-                backgroundImg.onload = () => {
-                    resolve(true);
-                };
-                backgroundImg.onerror = (error) => {
-                    reject(error);
-                };
-                backgroundImg.src = `/storage/${props.template.background_image}`;
-            });
-
-            
-            ctx.drawImage(backgroundImg, 0, 0, canvas.width, canvas.height);
-
-        } catch (error) {
-
-        }
-    }
-
-    
-    const elementsToRender = [...sortedElements.value].sort((a, b) => (a.zIndex || 0) - (b.zIndex || 0));
-
-
-    for (const element of elementsToRender) {
-
-        if (element.type === 'text') {
-            await renderTextElement(ctx, element);
-        } else if (element.type === 'image') {
-            await renderImageElement(ctx, element);
-        }
-    }
-
-
-};
-
-const renderTextElement = async (ctx: CanvasRenderingContext2D, element: any) => {
-    const { x, y, width, height, properties } = element;
-    const {
-        text,
-        fontSize,
-        color,
-        fontFamily,
-        fontWeight,
-        textAlign,
-        textDecoration,
-        textShadow,
-        backgroundColor,
-        hasBorder,
-        borderWidth,
-        borderColor,
-        borderRadius
-    } = properties;
-
-    if (!text) return;
-
-    
-    ctx.save();
-
-    
-    if (backgroundColor && backgroundColor !== 'transparent') {
-        ctx.fillStyle = backgroundColor;
-        if (borderRadius > 0) {
-            
-            ctx.beginPath();
-            ctx.roundRect(x, y, width, height, borderRadius);
-            ctx.fill();
-        } else {
-            ctx.fillRect(x, y, width, height);
-        }
-    }
-
-    
-    if (hasBorder && borderWidth > 0) {
-        ctx.strokeStyle = borderColor || '#000000';
-        ctx.lineWidth = borderWidth;
-        if (borderRadius > 0) {
-            ctx.beginPath();
-            ctx.roundRect(x, y, width, height, borderRadius);
-            ctx.stroke();
-        } else {
-            ctx.strokeRect(x, y, width, height);
-        }
-    }
-
-    
-    const fontStyle = properties.fontStyle || 'normal';
-    ctx.font = `${fontStyle} ${fontWeight || 'normal'} ${fontSize}px ${fontFamily || 'Arial'}`;
-    ctx.fillStyle = color || '#000000';
-    ctx.textAlign = (textAlign || 'left') as CanvasTextAlign;
-    ctx.textBaseline = 'middle';
-
-    
-    if (textShadow && textShadow !== 'none') {
-        const shadowParts = textShadow.split(' ');
-        if (shadowParts.length >= 3) {
-            ctx.shadowColor = shadowParts[2] || 'rgba(0,0,0,0.5)';
-            ctx.shadowOffsetX = parseInt(shadowParts[0]) || 2;
-            ctx.shadowOffsetY = parseInt(shadowParts[1]) || 2;
-            ctx.shadowBlur = shadowParts[3] ? parseInt(shadowParts[3]) : 4;
-        }
-    }
-
-    
-    const textX = textAlign === 'center' ? x + width / 2 :
-                  textAlign === 'right' ? x + width - 10 : x + 10;
-    const textY = y + height / 2;
-
-    
-    if (textDecoration === 'underline') {
-        ctx.fillText(text, textX, textY);
-        
-        const textMetrics = ctx.measureText(text);
-        ctx.beginPath();
-        ctx.moveTo(textX - textMetrics.width/2, textY + 5);
-        ctx.lineTo(textX + textMetrics.width/2, textY + 5);
-        ctx.stroke();
-    } else {
-        ctx.fillText(text, textX, textY);
-    }
-
-    
-    ctx.restore();
-};
-
-const renderImageElement = async (ctx: CanvasRenderingContext2D, element: any) => {
-    const { x, y, width, height, properties } = element;
-    const {
-        imageUrl,
-        imageFit,
-        borderRadius,
-        hasBorder,
-        borderWidth,
-        borderColor,
-        boxShadow
-    } = properties;
 
 
 
-    if (!imageUrl || !imageUrl.startsWith('blob:')) {
-
-        return;
-    }
-
-    try {
-
-        const img = new Image();
-        img.crossOrigin = 'anonymous';
-        await new Promise((resolve, reject) => {
-            img.onload = () => {
-
-                resolve(true);
-            };
-            img.onerror = (error) => {
-
-                reject(error);
-            };
-            img.src = imageUrl;
-        });
-
-        
-        ctx.save();
-
-        
-        if (boxShadow && boxShadow !== 'none') {
-            const shadowParts = boxShadow.split(' ');
-            if (shadowParts.length >= 3) {
-                ctx.shadowColor = shadowParts[2] || 'rgba(0,0,0,0.3)';
-                ctx.shadowOffsetX = parseInt(shadowParts[0]) || 2;
-                ctx.shadowOffsetY = parseInt(shadowParts[1]) || 2;
-                ctx.shadowBlur = shadowParts[3] ? parseInt(shadowParts[3]) : 4;
-            }
-        }
-
-        
-        if (borderRadius > 0) {
-            ctx.beginPath();
-            ctx.roundRect(x, y, width, height, borderRadius);
-            ctx.clip();
-        }
-
-        
-        if (imageFit === 'cover') {
-            
-            const imgAspect = img.width / img.height;
-            const areaAspect = width / height;
-
-            let drawWidth, drawHeight, drawX, drawY;
-
-            if (imgAspect > areaAspect) {
-                
-                drawHeight = height;
-                drawWidth = height * imgAspect;
-                drawX = x - (drawWidth - width) / 2;
-                drawY = y;
-            } else {
-                
-                drawWidth = width;
-                drawHeight = width / imgAspect;
-                drawX = x;
-                drawY = y - (drawHeight - height) / 2;
-            }
-
-
-            ctx.drawImage(img, drawX, drawY, drawWidth, drawHeight);
-        } else {
-            
-
-            ctx.drawImage(img, x, y, width, height);
-        }
-
-        
-        if (hasBorder && borderWidth > 0) {
-            ctx.shadowColor = 'transparent'; 
-            ctx.strokeStyle = borderColor || '#000000';
-            ctx.lineWidth = borderWidth;
-            if (borderRadius > 0) {
-                ctx.beginPath();
-                ctx.roundRect(x, y, width, height, borderRadius);
-                ctx.stroke();
-            } else {
-                ctx.strokeRect(x, y, width, height);
-            }
-        }
-
-        
-        ctx.restore();
-
-    } catch (error) {
-
-    }
-};
 
 const generateImage = async () => {
     isGenerating.value = true;
 
     try {
-        
+        // Find the preview container
         const previewElement = document.querySelector('.template-preview-container') as HTMLElement;
-        if (previewElement) {
-            try {
-                
-                const canvas = await html2canvas(previewElement, {
-                    width: props.template.width,
-                    height: props.template.height,
-                    scale: 1,
-                    useCORS: true,
-                    allowTaint: true,
-                    backgroundColor: '#ffffff',
-                    logging: false
-                });
+        if (!previewElement) {
+            throw new Error('Preview container not found');
+        }
 
-                const blob = await new Promise<Blob>((resolve, reject) => {
-                    canvas.toBlob((blob: Blob | null) => {
-                        if (blob) {
-                            resolve(blob);
-                        } else {
-                            reject(new Error('Failed to convert canvas to blob'));
-                        }
-                    }, 'image/png', 1.0);
-                });
-
-                
-                const url = URL.createObjectURL(blob);
-                const link = document.createElement('a');
-                link.href = url;
-                link.download = `${props.template.name}.png`;
-                link.click();
-
-                
-                URL.revokeObjectURL(url);
-
-                alert('Image generated successfully! Download should start automatically.');
-                return;
-            } catch (error) {
-
+        // Use dom-to-image for better CSS support
+        const dataUrl = await domtoimage.toPng(previewElement, {
+            quality: 1.0,
+            bgcolor: '#ffffff',
+            width: previewElement.offsetWidth,
+            height: previewElement.offsetHeight,
+            style: {
+                transform: 'scale(1)',
+                transformOrigin: 'top left'
             }
-        }
-
-        
-        await renderCanvas();
-
-        
-        const canvas = document.getElementById('template-canvas') as HTMLCanvasElement;
-        if (!canvas) {
-            throw new Error('Canvas not found');
-        }
-
-        
-        const blob = await new Promise<Blob>((resolve, reject) => {
-            canvas.toBlob((blob) => {
-                if (blob) {
-                    resolve(blob);
-                } else {
-                    reject(new Error('Failed to convert canvas to blob'));
-                }
-            }, 'image/png', 1.0);
         });
 
-        
-        const url = URL.createObjectURL(blob);
+        // Create download link
         const link = document.createElement('a');
-        link.href = url;
+        link.href = dataUrl;
         link.download = `${props.template.name}.png`;
         link.click();
 
-        
-        URL.revokeObjectURL(url);
-
-        
         alert('Image generated successfully! Download should start automatically.');
 
-    } catch (error) {
-
+    } catch (error: any) {
+        console.error('Error generating image:', error);
         alert(`Error generating image: ${error.message || 'Unknown error'}`);
     } finally {
         isGenerating.value = false;
@@ -742,13 +446,6 @@ const generateImage = async () => {
                             <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Template Preview</h2>
                         </div>
                         <div class="p-4">
-                            <!-- Hidden Canvas for Image Generation -->
-                            <canvas
-                                id="template-canvas"
-                                :width="template.width"
-                                :height="template.height"
-                                class="hidden"
-                            ></canvas>
 
                             <div class="flex justify-center items-start min-h-[400px]">
                                 <div class="relative" style="margin: 20px 0;">
@@ -841,13 +538,6 @@ const generateImage = async () => {
                                             border: element.properties.hasBorder ? `${element.properties.strokeWidth}px ${element.properties.borderStyle} ${element.properties.strokeColor}` : 'none',
                                             clipPath: 'polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%)'
                                         }"></div>
-                                    </div>
-
-                                    <!-- Template Info Overlay -->
-                                    <div class="absolute top-2 left-2">
-                                        <div class="bg-black bg-opacity-75 text-white px-2 py-1 rounded text-xs">
-                                            {{ template.width }} × {{ template.height }}px
-                                        </div>
                                     </div>
 
                                     <!-- Status Indicator -->
