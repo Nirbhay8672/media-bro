@@ -140,6 +140,56 @@ const imageElements = computed(() => {
     return canvasElements.value.filter(el => el.type === 'image');
 });
 
+// Drag functionality for text elements
+const isDragging = ref(false);
+const dragStart = ref({ x: 0, y: 0 });
+const draggedElement = ref<CanvasElement | null>(null);
+
+const handleElementMouseDown = (event: MouseEvent, element: CanvasElement) => {
+    if (element.type === 'text') {
+        event.preventDefault();
+        isDragging.value = true;
+        dragStart.value = {
+            x: event.clientX - element.x,
+            y: event.clientY - element.y
+        };
+        draggedElement.value = element;
+    }
+};
+
+const handleMouseMove = (event: MouseEvent) => {
+    if (isDragging.value && draggedElement.value) {
+        draggedElement.value.x = event.clientX - dragStart.value.x;
+        draggedElement.value.y = event.clientY - dragStart.value.y;
+    }
+};
+
+const handleMouseUp = (event: MouseEvent) => {
+    isDragging.value = false;
+    draggedElement.value = null;
+};
+
+// Image shape clip paths
+const getImageClipPath = (shape: string) => {
+    switch (shape) {
+        case 'circle':
+            return 'circle(50% at 50% 50%)';
+        case 'triangle':
+            return 'polygon(50% 0%, 0% 100%, 100% 100%)';
+        case 'star':
+            return 'polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%)';
+        case 'diamond':
+            return 'polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%)';
+        case 'hexagon':
+            return 'polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%)';
+        case 'octagon':
+            return 'polygon(30% 0%, 70% 0%, 100% 30%, 100% 70%, 70% 100%, 30% 100%, 0% 70%, 0% 30%)';
+        case 'rectangle':
+        default:
+            return 'none';
+    }
+};
+
 const canvasStyle = computed(() => {
     // Calculate scale to fit within viewport while maintaining aspect ratio
     const maxWidth = 800;
@@ -705,6 +755,8 @@ const generateImage = async () => {
                                     <div
                                         class="template-preview-container relative overflow-hidden border-2 border-gray-300 bg-gray-50 dark:border-gray-600 dark:bg-gray-700 shadow-lg rounded-lg"
                                         :style="canvasStyle"
+                                        @mousemove="handleMouseMove"
+                                        @mouseup="handleMouseUp"
                                     >
                                     <!-- Canvas Elements -->
                                     <div
@@ -722,26 +774,32 @@ const generateImage = async () => {
                                         }"
                                     >
                                         <!-- Text Element -->
-                                        <div v-if="element.type === 'text'" class="w-full h-full flex items-center justify-center" :style="{
-                                            color: element.properties.color,
-                                            backgroundColor: element.properties.backgroundColor,
-                                            fontSize: element.properties.fontSize + 'px',
-                                            fontFamily: element.properties.fontFamily,
-                                            fontWeight: element.properties.fontWeight,
-                                            fontStyle: element.properties.fontStyle,
-                                            textDecoration: element.properties.textDecoration,
-                                            textAlign: element.properties.textAlign,
-                                            lineHeight: element.properties.lineHeight,
-                                            border: element.properties.hasBorder ? `${element.properties.strokeWidth}px ${element.properties.borderStyle} ${element.properties.strokeColor}` : 'none',
-                                            borderRadius: element.properties.borderRadius + 'px'
-                                        }">
+                                        <div 
+                                            v-if="element.type === 'text'" 
+                                            class="w-full h-full flex items-center justify-center cursor-move select-none" 
+                                            :style="{
+                                                color: element.properties.color,
+                                                backgroundColor: element.properties.backgroundColor,
+                                                fontSize: element.properties.fontSize + 'px',
+                                                fontFamily: element.properties.fontFamily,
+                                                fontWeight: element.properties.fontWeight,
+                                                fontStyle: element.properties.fontStyle,
+                                                textDecoration: element.properties.textDecoration,
+                                                textAlign: element.properties.textAlign,
+                                                lineHeight: element.properties.lineHeight,
+                                                border: element.properties.hasBorder ? `${element.properties.strokeWidth}px ${element.properties.borderStyle} ${element.properties.strokeColor}` : 'none',
+                                                borderRadius: element.properties.borderRadius + 'px'
+                                            }"
+                                            @mousedown="handleElementMouseDown($event, element)"
+                                        >
                                             {{ element.properties.text || 'Your text here' }}
                                         </div>
 
                                         <!-- Image Element -->
                                         <div v-else-if="element.type === 'image'" class="w-full h-full flex items-center justify-center bg-gray-100 dark:bg-gray-600 rounded" :style="{
                                             border: element.properties.hasBorder ? `${element.properties.strokeWidth}px ${element.properties.borderStyle} ${element.properties.strokeColor}` : 'none',
-                                            borderRadius: element.properties.borderRadius + 'px'
+                                            borderRadius: element.properties.borderRadius + 'px',
+                                            clipPath: getImageClipPath(element.properties.imageShape || 'rectangle')
                                         }">
                                             <img
                                                 v-if="element.properties.imageUrl"
@@ -758,30 +816,30 @@ const generateImage = async () => {
 
                                         <!-- Rectangle Element -->
                                         <div v-else-if="element.type === 'rectangle'" class="w-full h-full" :style="{
-                                            backgroundColor: element.properties.fillColor,
+                                            backgroundColor: element.properties.fillColor || '#ffffff',
                                             border: element.properties.hasBorder ? `${element.properties.strokeWidth}px ${element.properties.borderStyle} ${element.properties.strokeColor}` : 'none',
                                             borderRadius: (element.properties.borderRadius || 0) + 'px'
                                         }"></div>
 
                                         <!-- Circle Element -->
                                         <div v-else-if="element.type === 'circle'" class="w-full h-full rounded-full" :style="{
-                                            backgroundColor: element.properties.fillColor,
+                                            backgroundColor: element.properties.fillColor || '#ffffff',
                                             border: element.properties.hasBorder ? `${element.properties.strokeWidth}px ${element.properties.borderStyle} ${element.properties.strokeColor}` : 'none'
                                         }"></div>
 
                                         <!-- Triangle Element -->
                                         <div v-else-if="element.type === 'triangle'" class="w-full h-full" :style="{
-                                            backgroundColor: element.properties.fillColor,
+                                            backgroundColor: element.properties.fillColor || '#ffffff',
                                             border: element.properties.hasBorder ? `${element.properties.strokeWidth}px ${element.properties.borderStyle} ${element.properties.strokeColor}` : 'none',
                                             clipPath: 'polygon(50% 0%, 0% 100%, 100% 100%)'
                                         }"></div>
 
                                         <!-- Star Element -->
                                         <div v-else-if="element.type === 'star'" class="w-full h-full" :style="{
-                                            backgroundColor: element.properties.fillColor,
+                                            backgroundColor: element.properties.fillColor || '#ffffff',
                                             border: element.properties.hasBorder ? `${element.properties.strokeWidth}px ${element.properties.borderStyle} ${element.properties.strokeColor}` : 'none',
                                             clipPath: 'polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%)'
-                                        }"                                        ></div>
+                                        }"></div>
                                     </div>
 
                                     <!-- Template Info Overlay -->
