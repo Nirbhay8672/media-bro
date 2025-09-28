@@ -327,38 +327,12 @@ const generateImage = async () => {
     <Head :title="template.name" />
 
     <div class="min-h-screen bg-gray-50 dark:bg-gray-900">
-        <!-- Header -->
-        <div class="border-b border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800">
-            <div class="mx-auto max-w-7xl px-4 py-4 sm:px-6 lg:px-8">
-                <div class="flex items-center justify-between">
-                    <div>
-                        <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ template.name }}</h1>
-                        <p v-if="template.description" class="text-gray-600 dark:text-gray-400">
-                            {{ template.description }}
-                        </p>
-                        <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                            Upload your images and customize the text content
-                        </p>
-                    </div>
-                    <button
-                        @click="generateImage"
-                        :disabled="isGenerating"
-                        class="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
-                    >
-                        <Download class="h-4 w-4" />
-                        {{ isGenerating ? 'Generating...' : 'Download Image' }}
-                    </button>
-                </div>
-            </div>
-        </div>
-
         <!-- Main Content -->
-        <div class="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+        <div class="mx-auto px-4 py-6 sm:px-6 lg:px-8">
             <div class="grid gap-6 lg:grid-cols-4">
                 <!-- Left Sidebar - Content Upload -->
                 <div class="lg:col-span-1">
                     <div class="space-y-4">
-                        <!-- Text Content -->
                         <div v-if="textElements.length > 0" class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
                             <div class="p-4 border-b border-gray-200 dark:border-gray-700">
                                 <h2 class="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
@@ -476,8 +450,16 @@ const generateImage = async () => {
                 <!-- Center - Template Preview -->
                 <div class="lg:col-span-3">
                     <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
-                        <div class="p-4 border-b border-gray-200 dark:border-gray-700">
-                            <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Template Preview</h2>
+                        <div class="p-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
+                            <h2 class="text-lg font-semibold text-gray-900 dark:text-white">{{ template.name }}</h2>
+                            <button
+                                @click="generateImage"
+                                :disabled="isGenerating"
+                                class="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+                            >
+                                <Download class="h-4 w-4" />
+                                {{ isGenerating ? 'Generating...' : 'Download Image' }}
+                            </button>
                         </div>
                         <div class="p-4">
 
@@ -572,14 +554,6 @@ const generateImage = async () => {
                                             border: element.properties.hasBorder ? `${element.properties.strokeWidth}px ${element.properties.borderStyle} ${element.properties.strokeColor}` : 'none',
                                             clipPath: 'polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%)'
                                         }"></div>
-                                    </div>
-
-                                    <!-- Status Indicator -->
-                                    <div class="absolute top-2 right-2">
-                                        <div
-                                            :class="template.background_image ? 'bg-green-500' : 'bg-gray-400'"
-                                            class="w-2 h-2 rounded-full"
-                                        ></div>
                                     </div>
                                     </div>
                                 </div>
