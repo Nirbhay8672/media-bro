@@ -27,6 +27,11 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->web(replace: [
             \Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class => VerifyCsrfToken::class,
         ]);
+
+        $middleware->alias([
+            'super_admin' => \App\Http\Middleware\SuperAdminMiddleware::class,
+            'subscription' => \App\Http\Middleware\CheckSubscription::class,
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {
         //

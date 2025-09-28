@@ -49,7 +49,6 @@ defineProps<{
                         :tabindex="1"
                         autocomplete="email"
                         placeholder="email@example.com"
-                        value="test@example.com"
                     />
                     <InputError :message="errors.email" />
                 </div>
@@ -74,7 +73,6 @@ defineProps<{
                         :tabindex="2"
                         autocomplete="current-password"
                         placeholder="Password"
-                        value="123123"
                     />
                     <InputError :message="errors.password" />
                 </div>

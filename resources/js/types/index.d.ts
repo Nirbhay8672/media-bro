@@ -32,6 +32,11 @@ export interface User {
     email: string;
     avatar?: string;
     email_verified_at: string | null;
+    role: 'super_admin' | 'admin' | 'user';
+    username?: string;
+    mobile?: string;
+    subscription_start_date?: string;
+    subscription_end_date?: string;
     created_at: string;
     updated_at: string;
 }

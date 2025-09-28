@@ -9,6 +9,7 @@ import TemplateSettings from '@/components/TemplateSettings.vue';
 import CanvasEditor from '@/components/CanvasEditor.vue';
 import ToolsPanel from '@/components/ToolsPanel.vue';
 import PropertiesPanel from '@/components/PropertiesPanel.vue';
+import Swal from 'sweetalert2';
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
@@ -277,9 +278,36 @@ const handleBackgroundImageChange = (file: File) => {
 // Form submission
 const submitForm = async () => {
     if (form.value.width < 100 || form.value.height < 100) {
-        alert('Canvas dimensions must be at least 100x100 pixels');
+        Swal.fire({
+            title: 'Invalid Dimensions',
+            text: 'Canvas dimensions must be at least 100x100 pixels',
+            icon: 'warning',
+            confirmButtonText: 'OK'
+        });
         return;
     }
+
+    if (!form.value.name.trim()) {
+        Swal.fire({
+            title: 'Missing Template Name',
+            text: 'Please enter a template name',
+            icon: 'warning',
+            confirmButtonText: 'OK'
+        });
+        return;
+    }
+
+    // Show loading state
+    Swal.fire({
+        title: 'Creating Template...',
+        text: 'Please wait while we save your template.',
+        allowOutsideClick: false,
+        allowEscapeKey: false,
+        showConfirmButton: false,
+        didOpen: () => {
+            Swal.showLoading();
+        }
+    });
 
     isSubmitting.value = true;
 
@@ -297,14 +325,31 @@ const submitForm = async () => {
     try {
         await router.post('/templates', formData, {
             onSuccess: () => {
-                // Handle success
+                Swal.fire({
+                    title: 'Success!',
+                    text: 'Template created successfully.',
+                    icon: 'success',
+                    confirmButtonText: 'OK'
+                });
             },
             onError: (errors) => {
                 console.error('Form submission errors:', errors);
+                Swal.fire({
+                    title: 'Error!',
+                    text: 'Failed to create template. Please try again.',
+                    icon: 'error',
+                    confirmButtonText: 'OK'
+                });
             }
         });
     } catch (error) {
         console.error('Form submission error:', error);
+        Swal.fire({
+            title: 'Error!',
+            text: 'An unexpected error occurred. Please try again.',
+            icon: 'error',
+            confirmButtonText: 'OK'
+        });
     } finally {
         isSubmitting.value = false;
     }

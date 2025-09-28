@@ -5,6 +5,7 @@ import { dashboard } from '@/routes';
 import templates from '@/routes/templates';
 import { type BreadcrumbItem } from '@/types';
 import { Plus, Edit, Trash2, Eye, Share2, Copy } from 'lucide-vue-next';
+import Swal from 'sweetalert2';
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
@@ -36,9 +37,37 @@ const props = defineProps<{
 
 
 const deleteTemplate = (id: number) => {
-    if (confirm('Are you sure you want to delete this template?')) {
-        router.delete(templates.destroy(id));
-    }
+    Swal.fire({
+        title: 'Are you sure?',
+        text: "You won't be able to revert this!",
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#d33',
+        cancelButtonColor: '#3085d6',
+        confirmButtonText: 'Yes, delete it!',
+        cancelButtonText: 'Cancel'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            router.delete(templates.destroy(id), {
+                onSuccess: () => {
+                    Swal.fire({
+                        title: 'Deleted!',
+                        text: 'Template has been deleted successfully.',
+                        icon: 'success',
+                        confirmButtonText: 'OK'
+                    });
+                },
+                onError: () => {
+                    Swal.fire({
+                        title: 'Error!',
+                        text: 'Failed to delete template. Please try again.',
+                        icon: 'error',
+                        confirmButtonText: 'OK'
+                    });
+                }
+            });
+        }
+    });
 };
 
 // Helper function to generate template URLs safely
@@ -63,8 +92,21 @@ const getTemplateEditUrl = (templateId: number) => {
 const copyShareLink = (shareToken: string) => {
     const shareUrl = `${window.location.origin}/template/${shareToken}`;
     navigator.clipboard.writeText(shareUrl).then(() => {
-        // You could add a toast notification here
-        alert('Share link copied to clipboard!');
+        Swal.fire({
+            title: 'Copied!',
+            text: 'Share link copied to clipboard!',
+            icon: 'success',
+            confirmButtonText: 'OK',
+            timer: 2000,
+            timerProgressBar: true
+        });
+    }).catch(() => {
+        Swal.fire({
+            title: 'Error!',
+            text: 'Failed to copy link. Please try again.',
+            icon: 'error',
+            confirmButtonText: 'OK'
+        });
     });
 };
 </script>

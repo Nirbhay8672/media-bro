@@ -14,22 +14,39 @@ import {
 import { dashboard } from '@/routes';
 import templates from '@/routes/templates';
 import { type NavItem } from '@/types';
-import { Link } from '@inertiajs/vue3';
-import { LayoutGrid, Image } from 'lucide-vue-next';
+import { Link, usePage } from '@inertiajs/vue3';
+import { LayoutGrid, Image, Users } from 'lucide-vue-next';
 import AppLogo from './AppLogo.vue';
+import { computed } from 'vue';
 
-const mainNavItems: NavItem[] = [
-    {
-        title: 'Dashboard',
-        href: dashboard(),
-        icon: LayoutGrid,
-    },
-    {
-        title: 'Templates',
-        href: templates.index(),
-        icon: Image,
-    },
-];
+const page = usePage();
+const user = computed(() => page.props.auth.user);
+
+const mainNavItems = computed((): NavItem[] => {
+    const items: NavItem[] = [
+        {
+            title: 'Dashboard',
+            href: dashboard(),
+            icon: LayoutGrid,
+        },
+        {
+            title: 'Templates',
+            href: templates.index(),
+            icon: Image,
+        },
+    ];
+
+    // Add user management for super admins
+    if (user.value?.role === 'super_admin') {
+        items.push({
+            title: 'User Management',
+            href: '/users',
+            icon: Users,
+        });
+    }
+
+    return items;
+});
 
 const footerNavItems: NavItem[] = [];
 </script>

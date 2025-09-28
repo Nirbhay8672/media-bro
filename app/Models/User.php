@@ -20,8 +20,13 @@ class User extends Authenticatable
      */
     protected $fillable = [
         'name',
+        'username',
         'email',
+        'mobile',
         'password',
+        'subscription_start_date',
+        'subscription_end_date',
+        'role',
     ];
 
     /**
@@ -44,6 +49,66 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'subscription_start_date' => 'date',
+            'subscription_end_date' => 'date',
         ];
+    }
+
+    /**
+     * Check if user is super admin
+     */
+    public function isSuperAdmin(): bool
+    {
+        return $this->role === 'super_admin';
+    }
+
+    /**
+     * Check if user is admin
+     */
+    public function isAdmin(): bool
+    {
+        return $this->role === 'admin';
+    }
+
+    /**
+     * Check if user can manage users (only super admin)
+     */
+    public function canManageUsers(): bool
+    {
+        return $this->isSuperAdmin();
+    }
+
+    /**
+     * Check if user has active subscription
+     */
+    public function hasActiveSubscription(): bool
+    {
+        if ($this->isSuperAdmin()) {
+            return true; // Super admin always has access
+        }
+
+        if (!$this->subscription_start_date || !$this->subscription_end_date) {
+            return false;
+        }
+
+        $now = now()->toDateString();
+        return $now >= $this->subscription_start_date->toDateString() && 
+               $now <= $this->subscription_end_date->toDateString();
+    }
+
+    /**
+     * Check if subscription is expired
+     */
+    public function isSubscriptionExpired(): bool
+    {
+        if ($this->isSuperAdmin()) {
+            return false;
+        }
+
+        if (!$this->subscription_end_date) {
+            return true;
+        }
+
+        return now()->toDateString() > $this->subscription_end_date->toDateString();
     }
 }
