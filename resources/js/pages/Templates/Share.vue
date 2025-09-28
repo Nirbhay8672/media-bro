@@ -3,6 +3,7 @@ import { Head } from '@inertiajs/vue3';
 import { Download, Type, Image, Upload } from 'lucide-vue-next';
 import { ref, computed } from 'vue';
 import * as domtoimage from 'dom-to-image';
+import Swal from 'sweetalert2';
 
 interface Template {
     id: number;
@@ -253,6 +254,18 @@ const removeImage = (element: CanvasElement) => {
 const generateImage = async () => {
     isGenerating.value = true;
 
+    // Show loading notification
+    Swal.fire({
+        title: 'Generating Image...',
+        text: 'Please wait while we create your image.',
+        allowOutsideClick: false,
+        allowEscapeKey: false,
+        showConfirmButton: false,
+        didOpen: () => {
+            Swal.showLoading();
+        }
+    });
+
     try {
         // Find the preview container
         const previewElement = document.querySelector('.template-preview-container') as HTMLElement;
@@ -276,13 +289,34 @@ const generateImage = async () => {
         const link = document.createElement('a');
         link.href = dataUrl;
         link.download = `${props.template.name}.png`;
+        document.body.appendChild(link);
         link.click();
+        document.body.removeChild(link);
 
-        alert('Image generated successfully! Download should start automatically.');
+        // Close loading and show success
+        Swal.close();
+        Swal.fire({
+            icon: 'success',
+            title: 'Download Complete!',
+            text: 'Your image has been downloaded successfully.',
+            timer: 3000,
+            timerProgressBar: true,
+            showConfirmButton: false,
+            toast: true,
+            position: 'top-end'
+        });
 
     } catch (error: any) {
         console.error('Error generating image:', error);
-        alert(`Error generating image: ${error.message || 'Unknown error'}`);
+        
+        // Close loading and show error
+        Swal.close();
+        Swal.fire({
+            icon: 'error',
+            title: 'Download Failed',
+            text: error.message || 'Unknown error occurred while generating image.',
+            confirmButtonText: 'Try Again'
+        });
     } finally {
         isGenerating.value = false;
     }
@@ -548,34 +582,6 @@ const generateImage = async () => {
                                         ></div>
                                     </div>
                                     </div>
-                                </div>
-                            </div>
-
-                            <!-- Template Info -->
-                            <div class="mt-4 text-center">
-                                <div class="inline-flex items-center gap-4 px-4 py-2 bg-gray-100 dark:bg-gray-700 rounded-lg">
-                                    <div class="text-sm">
-                                        <span class="font-medium text-gray-900 dark:text-white">Text Fields:</span>
-                                        <span class="text-gray-600 dark:text-gray-400 ml-1">{{ textElements.length }}</span>
-                                    </div>
-                                    <div class="w-px h-4 bg-gray-300 dark:bg-gray-600"></div>
-                                    <div class="text-sm">
-                                        <span class="font-medium text-gray-900 dark:text-white">Image Fields:</span>
-                                        <span class="text-gray-600 dark:text-gray-400 ml-1">{{ imageElements.length }}</span>
-                                    </div>
-                                    <div class="w-px h-4 bg-gray-300 dark:bg-gray-600"></div>
-                                    <div class="text-sm">
-                                        <span class="font-medium text-gray-900 dark:text-white">Status:</span>
-                                        <span
-                                            :class="template.background_image ? 'text-green-600 dark:text-green-400' : 'text-gray-500 dark:text-gray-400'"
-                                            class="ml-1"
-                                        >
-                                            {{ template.background_image ? 'Ready' : 'No background' }}
-                                        </span>
-                                    </div>
-                                </div>
-                                <div class="mt-2 text-xs text-gray-500 dark:text-gray-400">
-                                    This is a preview of your template. Fill in the content on the left to customize it.
                                 </div>
                             </div>
                         </div>
