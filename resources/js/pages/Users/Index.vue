@@ -124,7 +124,7 @@ const refreshUsers = () => {
                             <TableHead>Email</TableHead>
                             <TableHead>Username</TableHead>
                             <TableHead>Subscription</TableHead>
-                            <TableHead>Created</TableHead>
+                            <TableHead>Templates</TableHead>
                             <TableHead class="w-[50px]"></TableHead>
                         </TableRow>
                     </TableHeader>
@@ -140,7 +140,11 @@ const refreshUsers = () => {
                                 </div>
                                 <span v-else class="text-muted-foreground">No subscription</span>
                             </TableCell>
-                            <TableCell>{{ formatDate(user.created_at) }}</TableCell>
+                            <TableCell>
+                                <Badge variant="secondary">
+                                    {{ user.templates_count || 0 }} templates
+                                </Badge>
+                            </TableCell>
                             <TableCell>
                                 <DropdownMenu>
                                     <DropdownMenuTrigger as-child>

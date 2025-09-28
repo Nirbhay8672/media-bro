@@ -13,7 +13,11 @@ class UserController extends Controller
 {
     public function index(): Response
     {
-        $users = User::orderBy('created_at', 'desc')->paginate(10);
+        $users = User::withCount('templates')
+            ->orderBy('created_at', 'desc')
+            ->where('role', 'admin')
+            ->paginate(10);
+        
         return Inertia::render('Users/Index', [
             'users' => $users
         ]);
@@ -104,6 +108,8 @@ class UserController extends Controller
 
     public function show(User $user): Response
     {
+        $user->loadCount('templates');
+        
         return Inertia::render('Users/Show', [
             'user' => $user
         ]);

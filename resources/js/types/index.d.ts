@@ -39,6 +39,7 @@ export interface User {
     subscription_end_date?: string;
     created_at: string;
     updated_at: string;
+    templates_count?: number;
 }
 
 export type BreadcrumbItemType = BreadcrumbItem;
