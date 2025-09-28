@@ -289,7 +289,7 @@ interface Template {
     width: number
     height: number
     background_image?: string
-    canvas_data: CanvasElement[]
+    canvas_data: CanvasElement[] | string
     share_token: string
     is_active: boolean
     created_at: string

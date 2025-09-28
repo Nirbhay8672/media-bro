@@ -1,17 +1,37 @@
 <script setup lang="ts">
 import AppLayout from '@/layouts/AppLayout.vue';
-import { Head, router } from '@inertiajs/vue3';
+import { Head, router, usePage } from '@inertiajs/vue3';
 import { dashboard } from '@/routes';
-import templates from '@/routes/templates';
+import templates from '@/routes/templates/index';
 import { type BreadcrumbItem } from '@/types';
-import { ref, reactive, computed, watch } from 'vue';
+import { ref, reactive, computed, watch, onMounted } from 'vue';
 import TemplateSettings from '@/components/TemplateSettings.vue';
 import CanvasEditor from '@/components/CanvasEditor.vue';
 import ToolsPanel from '@/components/ToolsPanel.vue';
 import PropertiesPanel from '@/components/PropertiesPanel.vue';
 import Swal from 'sweetalert2';
 
-const breadcrumbs: BreadcrumbItem[] = [
+// Props for edit mode
+const props = defineProps<{
+    template?: {
+        id: number;
+        name: string;
+        description?: string;
+        width: number;
+        height: number;
+        background_image?: string;
+        canvas_data: any[] | string;
+        share_token: string;
+        is_active: boolean;
+        created_at: string;
+        updated_at: string;
+    };
+}>();
+
+const page = usePage();
+const isEditMode = computed(() => !!props.template);
+
+const breadcrumbs = computed<BreadcrumbItem[]>(() => [
     {
         title: 'Dashboard',
         href: dashboard().url,
@@ -21,10 +41,10 @@ const breadcrumbs: BreadcrumbItem[] = [
         href: templates.index().url,
     },
     {
-        title: 'Create Template',
+        title: isEditMode.value ? 'Edit Template' : 'Create Template',
         href: '#',
     },
-];
+]);
 
 const form = ref({
     name: '',
@@ -36,6 +56,33 @@ const form = ref({
 });
 
 const backgroundImagePreview = ref<string | null>(null);
+
+// Initialize form data for edit mode
+onMounted(() => {
+    if (isEditMode.value && props.template) {
+        form.value.name = props.template.name;
+        form.value.description = props.template.description || '';
+        form.value.width = props.template.width;
+        form.value.height = props.template.height;
+        
+        // Parse canvas data if it's a string
+        let canvasData = props.template.canvas_data;
+        if (typeof canvasData === 'string') {
+            try {
+                canvasData = JSON.parse(canvasData);
+            } catch (error) {
+                console.error('Error parsing canvas_data:', error);
+                canvasData = [];
+            }
+        }
+        canvasElements.value = Array.isArray(canvasData) ? canvasData : [];
+        
+        // Set background image preview if exists
+        if (props.template.background_image) {
+            backgroundImagePreview.value = `/storage/${props.template.background_image}`;
+        }
+    }
+});
 
 // Editor state
 const selectedTool = ref('select');
@@ -299,8 +346,8 @@ const submitForm = async () => {
 
     // Show loading state
     Swal.fire({
-        title: 'Creating Template...',
-        text: 'Please wait while we save your template.',
+        title: isEditMode.value ? 'Updating Template...' : 'Creating Template...',
+        text: isEditMode.value ? 'Please wait while we update your template.' : 'Please wait while we save your template.',
         allowOutsideClick: false,
         allowEscapeKey: false,
         showConfirmButton: false,
@@ -317,6 +364,12 @@ const submitForm = async () => {
     formData.append('width', form.value.width.toString());
     formData.append('height', form.value.height.toString());
     
+    // Add CSRF token
+    const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+    if (csrfToken) {
+        formData.append('_token', csrfToken);
+    }
+    
     // Debug logging
     console.log('Canvas elements being sent:', canvasElements.value);
     console.log('Canvas dimensions:', { width: form.value.width, height: form.value.height });
@@ -328,23 +381,43 @@ const submitForm = async () => {
     }
 
     try {
-        await router.post('/templates', formData, {
-            onSuccess: () => {
+        const url = isEditMode.value ? `/templates/${props.template?.id}` : '/templates';
+        const method = 'post';
+        
+        console.log('Submitting form:', {
+            url,
+            method,
+            isEditMode: isEditMode.value,
+            templateId: props.template?.id,
+            formData: Object.fromEntries(formData.entries())
+        });
+        
+        await router[method](url, formData, {
+            onSuccess: (page) => {
+                console.log('Form submission successful:', page);
                 Swal.fire({
                     title: 'Success!',
-                    text: 'Template created successfully.',
+                    text: `Template ${isEditMode.value ? 'updated' : 'created'} successfully.`,
                     icon: 'success',
                     confirmButtonText: 'OK'
+                }).then(() => {
+                    // Navigate back to templates index after success
+                    if (isEditMode.value) {
+                        window.location.href = '/templates';
+                    }
                 });
             },
             onError: (errors) => {
                 console.error('Form submission errors:', errors);
                 Swal.fire({
                     title: 'Error!',
-                    text: 'Failed to create template. Please try again.',
+                    text: `Failed to ${isEditMode.value ? 'update' : 'create'} template. Please try again.`,
                     icon: 'error',
                     confirmButtonText: 'OK'
                 });
+            },
+            onFinish: () => {
+                console.log('Form submission finished');
             }
         });
     } catch (error) {
@@ -376,7 +449,7 @@ const handleKeydown = (event: KeyboardEvent) => {
 </script>
 
 <template>
-    <Head title="Create Template" />
+    <Head :title="isEditMode ? 'Edit Template' : 'Create Template'" />
 
     <AppLayout :breadcrumbs="breadcrumbs">
         <div class="h-screen bg-gray-50 dark:bg-gray-900 overflow-hidden" @click="closeDropdownOnOutsideClick" @keydown="handleKeydown">
@@ -389,6 +462,7 @@ const handleKeydown = (event: KeyboardEvent) => {
                         v-model:backgroundImagePreview="backgroundImagePreview"
                         v-model:selectedQuickTemplate="selectedQuickTemplate"
                         v-model:isQuickTemplateDropdownOpen="isQuickTemplateDropdownOpen"
+                        :is-edit-mode="isEditMode"
                         @backgroundImageChange="handleBackgroundImageChange"
                         @applyQuickTemplate="applyQuickTemplate"
                     />

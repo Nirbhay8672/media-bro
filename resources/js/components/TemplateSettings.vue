@@ -13,6 +13,7 @@ interface Props {
     backgroundImagePreview: string | null;
     selectedQuickTemplate: { name: string; width: number; height: number } | null;
     isQuickTemplateDropdownOpen: boolean;
+    isEditMode?: boolean;
 }
 
 interface Emits {
@@ -223,13 +224,13 @@ const handleKeydown = (event: KeyboardEvent) => {
                     </div>
                 </div>
 
-                <!-- Create Template Button -->
+                <!-- Create/Update Template Button -->
                 <button
                     type="submit"
                     :disabled="!form.name"
                     class="w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
-                    Create Template
+                    {{ isEditMode ? 'Update Template' : 'Create Template' }}
                 </button>
             </div>
         </div>

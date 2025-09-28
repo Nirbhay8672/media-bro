@@ -124,12 +124,7 @@ const getTemplateShowUrl = (templateId: number) => {
 };
 
 const getTemplateEditUrl = (templateId: number) => {
-    try {
-        return templates.edit(templateId);
-    } catch (error) {
-        console.error('Error generating edit URL:', error);
-        return '#';
-    }
+    return `/templates/${templateId}/edit`;
 };
 
 const copyShareLink = (shareToken: string) => {

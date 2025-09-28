@@ -98,7 +98,7 @@ class TemplateController extends Controller
     {
         $this->authorize('update', $template);
 
-        return Inertia::render('Templates/Edit', [
+        return Inertia::render('Templates/Create', [
             'template' => $template
         ]);
     }
@@ -109,6 +109,13 @@ class TemplateController extends Controller
     public function update(Request $request, Template $template)
     {
         $this->authorize('update', $template);
+
+        // Debug logging
+        Log::info('Template update request:', [
+            'template_id' => $template->id,
+            'request_data' => $request->all(),
+            'canvas_data' => $request->canvas_data
+        ]);
 
         $request->validate([
             'name' => 'required|string|max:255',
@@ -141,6 +148,11 @@ class TemplateController extends Controller
         }
 
         $template->save();
+
+        Log::info('Template updated successfully:', [
+            'template_id' => $template->id,
+            'template_name' => $template->name
+        ]);
 
         return redirect()->route('templates.index')->with('success', 'Template updated successfully!');
     }

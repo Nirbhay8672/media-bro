@@ -234,7 +234,7 @@ const submit = () => {
 
   if (isEditMode.value && props.user) {
     // Edit mode - use PUT request
-    form.put(users.update.url(props.user.id), {
+    form.post(users.update.url(props.user.id), {
       onSuccess: () => {
         Swal.fire({
           title: 'Success!',
