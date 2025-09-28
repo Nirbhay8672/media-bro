@@ -6,7 +6,10 @@ use App\Http\Controllers\TemplateController;
 use App\Http\Controllers\UserController;
 
 Route::get('/', function () {
-    return Inertia::render('Welcome');
+    if (auth()->check()) {
+        return redirect()->route('dashboard');
+    }
+    return redirect()->route('login');
 })->name('home');
 
 Route::get('dashboard', function () {
