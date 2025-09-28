@@ -37,7 +37,6 @@ interface Props {
 
 const props = defineProps<Props>();
 
-// Modal state
 const showUserFormModal = ref(false);
 const showViewModal = ref(false);
 const showDeleteModal = ref(false);
@@ -67,7 +66,6 @@ const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString();
 };
 
-// Modal handlers
 const openCreateModal = () => {
     selectedUser.value = null;
     showUserFormModal.value = true;

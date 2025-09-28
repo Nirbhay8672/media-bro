@@ -108,12 +108,10 @@ const deleteTemplate = (id: number) => {
     });
 };
 
-// Helper function to generate template URLs safely
 const getTemplateShowUrl = (templateId: number) => {
     try {
         return templates.show(templateId);
     } catch (error) {
-        console.error('Error generating show URL:', error);
         return '#';
     }
 };
@@ -125,7 +123,6 @@ const getTemplateEditUrl = (templateId: number) => {
 const copyShareLink = (shareToken: string) => {
     const shareUrl = `${window.location.origin}/template/${shareToken}`;
     
-    // Modern clipboard API
     if (navigator.clipboard && window.isSecureContext) {
         navigator.clipboard.writeText(shareUrl).then(() => {
             showCopySuccess();
@@ -133,7 +130,6 @@ const copyShareLink = (shareToken: string) => {
             fallbackCopyText(shareUrl);
         });
     } else {
-        // Fallback for older browsers or non-HTTPS
         fallbackCopyText(shareUrl);
     }
 };

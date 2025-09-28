@@ -50,7 +50,6 @@ interface CanvasElement {
     rotation: number;
     zIndex: number;
     properties: {
-        // Text properties
         text?: string;
         fontSize?: number;
         fontFamily?: string;
@@ -60,33 +59,27 @@ interface CanvasElement {
         textAlign?: string;
         lineHeight?: number;
 
-        // Color properties
         color?: string;
         backgroundColor?: string;
 
-        // Border properties
         hasBorder?: boolean;
         borderWidth?: number;
         borderColor?: string;
         borderStyle?: string;
         borderRadius?: number;
 
-        // Shadow properties
         boxShadow?: string;
         textShadow?: string;
 
-        // Image properties
         imageUrl?: string;
         imageFit?: string;
         imagePlaceholder?: string;
 
-        // Shape properties
         shapeType?: string;
         fillColor?: string;
         strokeColor?: string;
         strokeWidth?: number;
 
-        // Brush properties
         brushSize?: number;
         brushColor?: string;
         brushOpacity?: number;
@@ -110,7 +103,6 @@ const backgroundImagePreview = ref<string | null>(
     props.template.background_image ? `/storage/${props.template.background_image}` : null
 );
 
-// Editor state
 const selectedTool = ref('select');
 const selectedElement = ref<CanvasElement | null>(null);
 const isDragging = ref(false);
@@ -120,16 +112,13 @@ const isResizing = ref(false);
 const resizeHandle = ref('');
 const resizeStart = ref({ x: 0, y: 0, width: 0, height: 0, fontSize: 0 });
 
-// Canvas elements
 const canvasElements = ref<CanvasElement[]>([]);
 
-// Initialize canvas elements with proper defaults
 const initializeCanvasElements = () => {
     const templateData = Array.isArray(props.template.canvas_data) ? props.template.canvas_data : [];
     canvasElements.value = templateData.map((element: any) => ({
         ...element,
         properties: {
-            // Text properties
             text: element.properties?.text || '',
             fontSize: element.properties?.fontSize || 16,
             fontFamily: element.properties?.fontFamily || 'Arial',
@@ -139,33 +128,27 @@ const initializeCanvasElements = () => {
             textAlign: element.properties?.textAlign || 'left',
             lineHeight: element.properties?.lineHeight || 1.2,
 
-            // Color properties
             color: element.properties?.color || '#000000',
             backgroundColor: element.properties?.backgroundColor || (element.type === 'text' ? 'transparent' : '#000000'),
 
-            // Border properties
             hasBorder: element.properties?.hasBorder || false,
             borderWidth: element.properties?.borderWidth || 1,
             borderColor: element.properties?.borderColor || '#000000',
             borderStyle: element.properties?.borderStyle || 'solid',
             borderRadius: element.properties?.borderRadius || 0,
 
-            // Shadow properties
             boxShadow: element.properties?.boxShadow || 'none',
             textShadow: element.properties?.textShadow || 'none',
 
-            // Image properties
             imageUrl: element.properties?.imageUrl || '',
             imageFit: element.properties?.imageFit || 'cover',
             imagePlaceholder: element.properties?.imagePlaceholder || (element.type === 'image' ? 'Upload Image' : ''),
 
-            // Shape properties
             shapeType: element.properties?.shapeType || element.type,
             fillColor: element.properties?.fillColor || '#000000',
             strokeColor: element.properties?.strokeColor || '#000000',
             strokeWidth: element.properties?.strokeWidth || 1,
 
-            // Brush properties
             brushSize: element.properties?.brushSize || 5,
             brushColor: element.properties?.brushColor || '#000000',
             brushOpacity: element.properties?.brushOpacity || 1,
@@ -173,10 +156,8 @@ const initializeCanvasElements = () => {
     }));
 };
 
-// Initialize on mount
 initializeCanvasElements();
 
-// Tools
 const tools = [
     { id: 'select', name: 'Select', icon: Move },
     { id: 'text', name: 'Text', icon: Type },
@@ -189,13 +170,11 @@ const tools = [
     { id: 'image', name: 'Image', icon: Image },
 ];
 
-// Font families
 const fontFamilies = [
     'Arial', 'Helvetica', 'Times New Roman', 'Georgia', 'Verdana',
     'Trebuchet MS', 'Arial Black', 'Impact', 'Comic Sans MS', 'Courier New'
 ];
 
-// Shadow presets
 const shadowPresets = [
     { name: 'None', value: 'none' },
     { name: 'Small', value: '0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.24)' },
@@ -204,7 +183,6 @@ const shadowPresets = [
     { name: 'Extra Large', value: '0 14px 28px rgba(0,0,0,0.25), 0 10px 10px rgba(0,0,0,0.22)' },
 ];
 
-// Border styles
 const borderStyles = [
     { name: 'Solid', value: 'solid' },
     { name: 'Dashed', value: 'dashed' },
@@ -212,14 +190,12 @@ const borderStyles = [
     { name: 'Double', value: 'double' },
 ];
 
-// Color palette
 const colorPalette = [
     '#000000', '#FFFFFF', '#FF0000', '#00FF00', '#0000FF', '#FFFF00',
     '#FF00FF', '#00FFFF', '#FFA500', '#800080', '#FFC0CB', '#A52A2A',
     '#808080', '#FFD700', '#008000', '#000080', '#FF6347', '#40E0D0'
 ];
 
-// Quick templates
 const quickTemplates = [
     { name: 'Instagram Post', width: 1080, height: 1080 },
     { name: 'Instagram Story', width: 1080, height: 1920 },
@@ -234,7 +210,6 @@ const handleBackgroundImage = (event: Event) => {
     if (target.files && target.files[0]) {
         form.value.background_image = target.files[0];
 
-        // Create preview
         const reader = new FileReader();
         reader.onload = (e) => {
             backgroundImagePreview.value = e.target?.result as string;
@@ -248,7 +223,6 @@ const removeBackgroundImage = () => {
     backgroundImagePreview.value = null;
 };
 
-// Create new element
 const createElement = (type: string) => {
     const maxZIndex = Math.max(...canvasElements.value.map(el => el.zIndex), 0);
 
@@ -262,7 +236,6 @@ const createElement = (type: string) => {
         rotation: 0,
         zIndex: maxZIndex + 1,
         properties: {
-            // Text properties
             text: type === 'text' ? 'Sample Text' : '',
             fontSize: 16,
             fontFamily: 'Arial',
@@ -272,33 +245,27 @@ const createElement = (type: string) => {
             textAlign: 'left',
             lineHeight: 1.2,
 
-            // Color properties
             color: '#000000',
             backgroundColor: type === 'text' ? 'transparent' : '#000000',
 
-            // Border properties
             hasBorder: false,
             borderWidth: 1,
             borderColor: '#000000',
             borderStyle: 'solid',
             borderRadius: 0,
 
-            // Shadow properties
             boxShadow: 'none',
             textShadow: 'none',
 
-            // Image properties
             imageUrl: '',
             imageFit: 'cover',
             imagePlaceholder: type === 'image' ? 'Upload Image' : '',
 
-            // Shape properties
             shapeType: type,
             fillColor: '#000000',
             strokeColor: '#000000',
             strokeWidth: 1,
 
-            // Brush properties
             brushSize: 5,
             brushColor: '#000000',
             brushOpacity: 1,
@@ -310,13 +277,11 @@ const createElement = (type: string) => {
     selectedTool.value = 'select';
 };
 
-// Select element
 const selectElement = (element: CanvasElement) => {
     selectedElement.value = element;
     selectedTool.value = 'select';
 };
 
-// Delete element
 const deleteElement = (elementId: string) => {
     const index = canvasElements.value.findIndex(el => el.id === elementId);
     if (index > -1) {
@@ -327,7 +292,6 @@ const deleteElement = (elementId: string) => {
     }
 };
 
-// Update element properties
 const updateElementProperty = (elementId: string, property: string, value: any) => {
     const element = canvasElements.value.find(el => el.id === elementId);
     if (element) {
@@ -335,7 +299,6 @@ const updateElementProperty = (elementId: string, property: string, value: any) 
     }
 };
 
-// Layer controls
 const bringToFront = (elementId: string) => {
     const element = canvasElements.value.find(el => el.id === elementId);
     if (element) {
@@ -366,7 +329,6 @@ const sendBackward = (elementId: string) => {
     }
 };
 
-// Duplicate element
 const duplicateElement = (elementId: string) => {
     const element = canvasElements.value.find(el => el.id === elementId);
     if (element) {
@@ -382,13 +344,11 @@ const duplicateElement = (elementId: string) => {
     }
 };
 
-// Quick template
 const applyQuickTemplate = (template: any) => {
     form.value.width = template.width;
     form.value.height = template.height;
 };
 
-// Mouse events
 const handleMouseDown = (event: MouseEvent) => {
     if (selectedTool.value === 'select') return;
 
@@ -424,7 +384,6 @@ const handleMouseUp = () => {
     resizeHandle.value = '';
 };
 
-// Drag functionality
 const handleDragStart = (event: MouseEvent, element: CanvasElement) => {
     event.stopPropagation();
     selectedElement.value = element;
@@ -435,7 +394,6 @@ const handleDragStart = (event: MouseEvent, element: CanvasElement) => {
     };
 };
 
-// Resize functionality
 const handleResizeStart = (event: MouseEvent, element: CanvasElement, handle: string) => {
     event.stopPropagation();
     selectedElement.value = element;
@@ -455,20 +413,15 @@ const handleResizeMove = (event: MouseEvent) => {
         const deltaX = event.clientX - resizeStart.value.x;
         const deltaY = event.clientY - resizeStart.value.y;
 
-        // Only bottom-right corner resize with proportional scaling
         if (resizeHandle.value === 'se') {
-            // Calculate the scale factor based on the larger dimension change
             const scaleX = (resizeStart.value.width + deltaX) / resizeStart.value.width;
             const scaleY = (resizeStart.value.height + deltaY) / resizeStart.value.height;
 
-            // Use the smaller scale factor to maintain aspect ratio
             const scale = Math.min(scaleX, scaleY);
 
-            // Apply proportional scaling
             selectedElement.value.width = Math.max(20, resizeStart.value.width * scale);
             selectedElement.value.height = Math.max(20, resizeStart.value.height * scale);
 
-            // For text elements, also scale the font size proportionally
             if (selectedElement.value.type === 'text') {
                 selectedElement.value.properties.fontSize = Math.max(8, Math.round(resizeStart.value.fontSize * scale));
             }
@@ -476,7 +429,6 @@ const handleResizeMove = (event: MouseEvent) => {
     }
 };
 
-// Computed properties
 const sortedElements = computed(() => {
     return [...canvasElements.value].sort((a, b) => a.zIndex - b.zIndex);
 });

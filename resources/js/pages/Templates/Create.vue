@@ -11,7 +11,6 @@ import ToolsPanel from '@/components/ToolsPanel.vue';
 import PropertiesPanel from '@/components/PropertiesPanel.vue';
 import Swal from 'sweetalert2';
 
-// Props for edit mode
 const props = defineProps<{
     template?: {
         id: number;
@@ -57,7 +56,6 @@ const form = ref({
 
 const backgroundImagePreview = ref<string | null>(null);
 
-// Initialize form data for edit mode
 onMounted(() => {
     if (isEditMode.value && props.template) {
         form.value.name = props.template.name;
@@ -65,26 +63,22 @@ onMounted(() => {
         form.value.width = props.template.width;
         form.value.height = props.template.height;
         
-        // Parse canvas data if it's a string
         let canvasData = props.template.canvas_data;
         if (typeof canvasData === 'string') {
             try {
                 canvasData = JSON.parse(canvasData);
             } catch (error) {
-                console.error('Error parsing canvas_data:', error);
                 canvasData = [];
             }
         }
         canvasElements.value = Array.isArray(canvasData) ? canvasData : [];
         
-        // Set background image preview if exists
         if (props.template.background_image) {
             backgroundImagePreview.value = `/storage/${props.template.background_image}`;
         }
     }
 });
 
-// Editor state
 const selectedTool = ref('select');
 const selectedElement = ref<CanvasElement | null>(null);
 const isDragging = ref(false);
@@ -94,14 +88,11 @@ const isResizing = ref(false);
 const resizeHandle = ref('');
 const resizeStart = ref({ x: 0, y: 0, width: 0, height: 0, fontSize: 0 });
 
-// Quick template dropdown state
 const isQuickTemplateDropdownOpen = ref(false);
 const selectedQuickTemplate = ref<{ name: string; width: number; height: number } | null>(null);
 
-// Canvas elements
 const canvasElements = ref<CanvasElement[]>([]);
 
-// CanvasElement interface
 interface CanvasElement {
     id: string;
     type: 'text' | 'image' | 'rectangle' | 'circle' | 'triangle' | 'star';
@@ -138,12 +129,9 @@ interface CanvasElement {
     };
 }
 
-// Watch for changes in selectedElement to force reactivity
 watch(selectedElement, () => {
-    // Force reactivity update
 }, { deep: true });
 
-// Element creation
 const createElement = (type: CanvasElement['type'], x: number, y: number) => {
     const maxZIndex = canvasElements.value.length > 0 ? Math.max(...canvasElements.value.map(el => el.zIndex)) : 0;
     
@@ -188,13 +176,11 @@ const createElement = (type: CanvasElement['type'], x: number, y: number) => {
     selectedTool.value = 'select';
 };
 
-// Element selection
 const selectElement = (element: CanvasElement) => {
     selectedElement.value = element;
     selectedTool.value = 'select';
 };
 
-// Element property updates
 const updateElementProperty = (elementId: string, property: string, value: any) => {
     const elementIndex = canvasElements.value.findIndex(el => el.id === elementId);
     if (elementIndex !== -1) {
@@ -208,7 +194,6 @@ const updateElementProperty = (elementId: string, property: string, value: any) 
     }
 };
 
-// Canvas click handler
 const handleCanvasClick = (event: MouseEvent) => {
     if (selectedTool.value !== 'select') {
         const rect = (event.target as HTMLElement).getBoundingClientRect();
@@ -218,7 +203,6 @@ const handleCanvasClick = (event: MouseEvent) => {
     }
 };
 
-// Element mouse down handler
 const handleElementMouseDown = (event: MouseEvent, element: CanvasElement) => {
     if (selectedTool.value === 'select') {
         event.preventDefault();
@@ -231,7 +215,6 @@ const handleElementMouseDown = (event: MouseEvent, element: CanvasElement) => {
     }
 };
 
-// Mouse move handler
 const handleMouseMove = (event: MouseEvent) => {
     if (isDragging.value && selectedElement.value) {
         selectedElement.value.x = event.clientX - dragStart.value.x;
@@ -239,12 +222,10 @@ const handleMouseMove = (event: MouseEvent) => {
     }
 };
 
-// Mouse up handler
 const handleMouseUp = (event: MouseEvent) => {
     isDragging.value = false;
 };
 
-// Element manipulation functions
 const bringToFront = (elementId: string) => {
     const element = canvasElements.value.find(el => el.id === elementId);
     if (element) {
@@ -287,7 +268,6 @@ const deleteElement = (elementId: string) => {
     }
 };
 
-// Resize element handler
 const handleResizeElement = (elementId: string, width: number, height: number, x: number, y: number, fontSize?: number) => {
     const element = canvasElements.value.find(el => el.id === elementId);
     if (element) {
@@ -296,7 +276,6 @@ const handleResizeElement = (elementId: string, width: number, height: number, x
         element.x = x;
         element.y = y;
         
-        // Update font size for text elements
         if (element.type === 'text' && fontSize !== undefined) {
             element.properties.fontSize = fontSize;
         }
@@ -308,7 +287,6 @@ const handleResizeElement = (elementId: string, width: number, height: number, x
 };
 
 
-// Quick template functions
 const applyQuickTemplate = (template: { name: string; width: number; height: number }) => {
     selectedQuickTemplate.value = template;
     if (template.name !== 'Custom') {
@@ -322,7 +300,6 @@ const handleBackgroundImageChange = (file: File) => {
     form.value.background_image = file;
 };
 
-// Form submission
 const submitForm = async () => {
     if (form.value.width < 100 || form.value.height < 100) {
         Swal.fire({
@@ -344,7 +321,6 @@ const submitForm = async () => {
         return;
     }
 
-    // Show loading state
     Swal.fire({
         title: isEditMode.value ? 'Updating Template...' : 'Creating Template...',
         text: isEditMode.value ? 'Please wait while we update your template.' : 'Please wait while we save your template.',
@@ -364,15 +340,10 @@ const submitForm = async () => {
     formData.append('width', form.value.width.toString());
     formData.append('height', form.value.height.toString());
     
-    // Add CSRF token
     const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
     if (csrfToken) {
         formData.append('_token', csrfToken);
     }
-    
-    // Debug logging
-    console.log('Canvas elements being sent:', canvasElements.value);
-    console.log('Canvas dimensions:', { width: form.value.width, height: form.value.height });
     
     formData.append('canvas_data', JSON.stringify(canvasElements.value));
 
@@ -384,31 +355,21 @@ const submitForm = async () => {
         const url = isEditMode.value ? `/templates/${props.template?.id}` : '/templates';
         const method = 'post';
         
-        console.log('Submitting form:', {
-            url,
-            method,
-            isEditMode: isEditMode.value,
-            templateId: props.template?.id,
-            formData: Object.fromEntries(formData.entries())
-        });
         
         await router[method](url, formData, {
             onSuccess: (page) => {
-                console.log('Form submission successful:', page);
                 Swal.fire({
                     title: 'Success!',
                     text: `Template ${isEditMode.value ? 'updated' : 'created'} successfully.`,
                     icon: 'success',
                     confirmButtonText: 'OK'
                 }).then(() => {
-                    // Navigate back to templates index after success
                     if (isEditMode.value) {
                         window.location.href = '/templates';
                     }
                 });
             },
             onError: (errors) => {
-                console.error('Form submission errors:', errors);
                 Swal.fire({
                     title: 'Error!',
                     text: `Failed to ${isEditMode.value ? 'update' : 'create'} template. Please try again.`,
@@ -417,11 +378,9 @@ const submitForm = async () => {
                 });
             },
             onFinish: () => {
-                console.log('Form submission finished');
             }
         });
     } catch (error) {
-        console.error('Form submission error:', error);
         Swal.fire({
             title: 'Error!',
             text: 'An unexpected error occurred. Please try again.',
@@ -433,7 +392,6 @@ const submitForm = async () => {
     }
 };
 
-// Dropdown handlers
 const closeDropdownOnOutsideClick = (event: Event) => {
     const target = event.target as HTMLElement;
     if (!target.closest('.quick-template-dropdown')) {

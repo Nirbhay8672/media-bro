@@ -59,7 +59,6 @@ const formatDate = (dateString: string) => {
 }
 
 const logout = () => {
-    // Use POST method for logout
     router.post('/logout')
 }
 </script>
