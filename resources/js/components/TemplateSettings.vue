@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
-import { ChevronDown } from 'lucide-vue-next';
+import { ChevronDown, Loader2, Upload } from 'lucide-vue-next';
 
 interface Props {
     form: {
@@ -14,6 +14,7 @@ interface Props {
     selectedQuickTemplate: { name: string; width: number; height: number } | null;
     isQuickTemplateDropdownOpen: boolean;
     isEditMode?: boolean;
+    isSubmitting?: boolean;
 }
 
 interface Emits {
@@ -227,10 +228,16 @@ const handleKeydown = (event: KeyboardEvent) => {
                 <!-- Create/Update Template Button -->
                 <button
                     type="submit"
-                    :disabled="!form.name"
-                    class="w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    :disabled="!form.name || isSubmitting"
+                    class="w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
                 >
-                    {{ isEditMode ? 'Update Template' : 'Create Template' }}
+                    <Loader2 v-if="isSubmitting" class="h-4 w-4 animate-spin" />
+                    <span>
+                        {{ isSubmitting 
+                            ? (isEditMode ? 'Updating...' : 'Creating...') 
+                            : (isEditMode ? 'Update Template' : 'Create Template') 
+                        }}
+                    </span>
                 </button>
             </div>
         </div>

@@ -10,6 +10,7 @@ import CanvasEditor from '@/components/CanvasEditor.vue';
 import ToolsPanel from '@/components/ToolsPanel.vue';
 import PropertiesPanel from '@/components/PropertiesPanel.vue';
 import Swal from 'sweetalert2';
+import axios from 'axios';
 
 const props = defineProps<{
     template?: {
@@ -321,69 +322,78 @@ const submitForm = async () => {
         return;
     }
 
-    Swal.fire({
-        title: isEditMode.value ? 'Updating Template...' : 'Creating Template...',
-        text: isEditMode.value ? 'Please wait while we update your template.' : 'Please wait while we save your template.',
-        allowOutsideClick: false,
-        allowEscapeKey: false,
-        showConfirmButton: false,
-        didOpen: () => {
-            Swal.showLoading();
-        }
-    });
-
     isSubmitting.value = true;
 
-    const formData = new FormData();
-    formData.append('name', form.value.name);
-    formData.append('description', form.value.description);
-    formData.append('width', form.value.width.toString());
-    formData.append('height', form.value.height.toString());
-    
-    const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
-    if (csrfToken) {
-        formData.append('_token', csrfToken);
-    }
-    
-    formData.append('canvas_data', JSON.stringify(canvasElements.value));
-
-    if (form.value.background_image) {
-        formData.append('background_image', form.value.background_image);
-    }
-
     try {
-        const url = isEditMode.value ? `/templates/${props.template?.id}` : '/templates';
-        const method = 'post';
+        // Create FormData for file upload
+        const formDataObj = new FormData();
+        formDataObj.append('name', form.value.name);
+        formDataObj.append('description', form.value.description);
+        formDataObj.append('width', form.value.width.toString());
+        formDataObj.append('height', form.value.height.toString());
+        formDataObj.append('canvas_data', JSON.stringify(canvasElements.value));
         
+        if (form.value.background_image) {
+            formDataObj.append('background_image', form.value.background_image);
+        }
+
+        if (isEditMode.value) {
+            
+            const response = await axios.post(`/templates/${props.template?.id}`, formDataObj, {
+                headers: {
+                    'Content-Type': 'multipart/form-data',
+                },
+            });
+
+            Swal.fire({
+                title: 'Success!',
+                text: `Template updated successfully.`,
+                icon: 'success',
+                position: 'top-end',
+                showConfirmButton: false,
+                timer: 3000,
+                timerProgressBar: true,
+                toast: true
+            }).then(() => {
+                router.visit('/templates');
+            });
+        } else {
+            const response = await axios.post('/templates', formDataObj, {
+                headers: {
+                    'Content-Type': 'multipart/form-data',
+                },
+            });
+
+            Swal.fire({
+                title: 'Success!',
+                text: `Template created successfully.`,
+                icon: 'success',
+                position: 'top-end',
+                showConfirmButton: false,
+                timer: 3000,
+                timerProgressBar: true,
+                toast: true
+            }).then(() => {
+                router.visit('/templates');
+            });
+        }
+    } catch (error: any) {
+        console.error('Error submitting form:', error);
         
-        await router[method](url, formData, {
-            onSuccess: (page) => {
-                Swal.fire({
-                    title: 'Success!',
-                    text: `Template ${isEditMode.value ? 'updated' : 'created'} successfully.`,
-                    icon: 'success',
-                    confirmButtonText: 'OK'
-                }).then(() => {
-                    if (isEditMode.value) {
-                        window.location.href = '/templates';
-                    }
-                });
-            },
-            onError: (errors) => {
-                Swal.fire({
-                    title: 'Error!',
-                    text: `Failed to ${isEditMode.value ? 'update' : 'create'} template. Please try again.`,
-                    icon: 'error',
-                    confirmButtonText: 'OK'
-                });
-            },
-            onFinish: () => {
+        let errorMessage = 'An unexpected error occurred. Please try again.';
+        if (error.response && error.response.data && error.response.data.message) {
+            errorMessage = error.response.data.message;
+        } else if (error.response && error.response.data && error.response.data.errors) {
+            const errors = error.response.data.errors;
+            const firstError = Object.values(errors)[0];
+            if (Array.isArray(firstError) && firstError.length > 0) {
+                errorMessage = firstError[0];
             }
-        });
-    } catch (error) {
+        }
+
         Swal.fire({
             title: 'Error!',
-            text: 'An unexpected error occurred. Please try again.',
+            text: errorMessage,
             icon: 'error',
             confirmButtonText: 'OK'
         });
@@ -421,6 +431,7 @@ const handleKeydown = (event: KeyboardEvent) => {
                         v-model:selectedQuickTemplate="selectedQuickTemplate"
                         v-model:isQuickTemplateDropdownOpen="isQuickTemplateDropdownOpen"
                         :is-edit-mode="isEditMode"
+                        :is-submitting="isSubmitting"
                         @backgroundImageChange="handleBackgroundImageChange"
                         @applyQuickTemplate="applyQuickTemplate"
                     />

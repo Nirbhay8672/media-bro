@@ -47,44 +47,7 @@ class TemplateController extends Controller
      */
     public function store(Request $request)
     {
-        $request->validate([
-            'name' => 'required|string|max:255',
-            'description' => 'nullable|string',
-            'width' => 'required|integer|min:100|max:4000',
-            'height' => 'required|integer|min:100|max:4000',
-            'background_image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:10240',
-        ]);
-
-        $template = new Template();
-        $template->name = $request->name;
-        $template->description = $request->description;
-        $template->width = $request->width;
-        $template->height = $request->height;
-        
-        // Parse canvas_data if it's a JSON string
-        $canvasData = $request->canvas_data ?? [];
-        if (is_string($canvasData)) {
-            $canvasData = json_decode($canvasData, true) ?? [];
-        }
-        
-        // Debug logging
-        Log::info('Canvas data being saved:', [
-            'raw' => $request->canvas_data,
-            'parsed' => $canvasData,
-            'width' => $request->width,
-            'height' => $request->height
-        ]);
-        
-        $template->canvas_data = $canvasData;
-        $template->user_id = auth()->id();
-
-        if ($request->hasFile('background_image')) {
-            $template->background_image = $request->file('background_image')->store('templates/backgrounds', 'public');
-        }
-
-        $template->save();
-
-        return redirect()->route('templates.index')->with('success', 'Template created successfully!');
+        return $this->save($request);
     }
 
     /**
@@ -117,14 +80,16 @@ class TemplateController extends Controller
     public function update(Request $request, Template $template)
     {
         $this->authorize('update', $template);
+        return $this->save($request, $template);
+    }
 
-        // Debug logging
-        Log::info('Template update request:', [
-            'template_id' => $template->id,
-            'request_data' => $request->all(),
-            'canvas_data' => $request->canvas_data
-        ]);
-
+    /**
+     * Save template (create or update)
+     */
+    private function save(Request $request, Template $template = null)
+    {
+        $isUpdate = $template !== null;
+        
         $request->validate([
             'name' => 'required|string|max:255',
             'description' => 'nullable|string',
@@ -133,23 +98,43 @@ class TemplateController extends Controller
             'background_image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:10240',
         ]);
 
+        if ($isUpdate) {
+            // Debug logging for update
+            Log::info('Template update request:', [
+                'template_id' => $template->id,
+                'request_data' => $request->all(),
+                'canvas_data' => $request->canvas_data
+            ]);
+        } else {
+            // Debug logging for create
+            Log::info('Canvas data being saved:', [
+                'raw' => $request->canvas_data,
+                'parsed' => $request->canvas_data,
+                'width' => $request->width,
+                'height' => $request->height
+            ]);
+        }
+
+        if (!$isUpdate) {
+            $template = new Template();
+            $template->user_id = auth()->id();
+        }
+
         $template->name = $request->name;
         $template->description = $request->description;
         $template->width = $request->width;
         $template->height = $request->height;
         
         // Parse canvas_data if it's a JSON string
-        if ($request->has('canvas_data')) {
-            $canvasData = $request->canvas_data;
-            if (is_string($canvasData)) {
-                $canvasData = json_decode($canvasData, true) ?? [];
-            }
-            $template->canvas_data = $canvasData;
+        $canvasData = $request->canvas_data ?? [];
+        if (is_string($canvasData)) {
+            $canvasData = json_decode($canvasData, true) ?? [];
         }
+        $template->canvas_data = $canvasData;
 
         if ($request->hasFile('background_image')) {
-            // Delete old background image
-            if ($template->background_image) {
+            // Delete old background image if updating
+            if ($isUpdate && $template->background_image) {
                 Storage::disk('public')->delete($template->background_image);
             }
             $template->background_image = $request->file('background_image')->store('templates/backgrounds', 'public');
@@ -157,12 +142,15 @@ class TemplateController extends Controller
 
         $template->save();
 
-        Log::info('Template updated successfully:', [
-            'template_id' => $template->id,
-            'template_name' => $template->name
-        ]);
-
-        return redirect()->route('templates.index')->with('success', 'Template updated successfully!');
+        if ($isUpdate) {
+            Log::info('Template updated successfully:', [
+                'template_id' => $template->id,
+                'template_name' => $template->name
+            ]);
+            return back()->with('success', 'Template updated successfully!');
+        } else {
+            return back()->with('success', 'Template created successfully!');
+        }
     }
 
     /**

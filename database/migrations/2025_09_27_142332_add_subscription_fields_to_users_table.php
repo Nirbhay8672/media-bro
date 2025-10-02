@@ -16,7 +16,7 @@ return new class extends Migration
             $table->string('mobile')->nullable()->after('email');
             $table->date('subscription_start_date')->nullable()->after('mobile');
             $table->date('subscription_end_date')->nullable()->after('subscription_start_date');
-            $table->enum('role', ['super_admin', 'admin'])->default('admin')->after('subscription_end_date');
+            $table->enum('role', ['super_admin', 'admin', 'user'])->default('user')->after('subscription_end_date');
         });
     }
 

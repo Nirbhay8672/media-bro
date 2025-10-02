@@ -220,18 +220,6 @@ const closeModal = () => {
 };
 
 const submit = () => {
-  // Show loading state
-  Swal.fire({
-    title: isEditMode.value ? 'Updating user...' : 'Creating user...',
-    text: 'Please wait while we process your request.',
-    allowOutsideClick: false,
-    allowEscapeKey: false,
-    showConfirmButton: false,
-    didOpen: () => {
-      Swal.showLoading();
-    }
-  });
-
   if (isEditMode.value && props.user) {
     // Edit mode - use PUT request
     form.post(users.update.url(props.user.id), {
@@ -240,7 +228,11 @@ const submit = () => {
           title: 'Success!',
           text: 'User updated successfully.',
           icon: 'success',
-          confirmButtonText: 'OK'
+          position: 'top-end',
+          showConfirmButton: false,
+          timer: 3000,
+          timerProgressBar: true,
+          toast: true
         });
         closeModal();
         emit('success');
@@ -250,7 +242,11 @@ const submit = () => {
           title: 'Error!',
           text: 'Failed to update user. Please try again.',
           icon: 'error',
-          confirmButtonText: 'OK'
+          position: 'top-end',
+          showConfirmButton: false,
+          timer: 4000,
+          timerProgressBar: true,
+          toast: true
         });
       }
     });
@@ -262,7 +258,11 @@ const submit = () => {
           title: 'Success!',
           text: 'User created successfully.',
           icon: 'success',
-          confirmButtonText: 'OK'
+          position: 'top-end',
+          showConfirmButton: false,
+          timer: 3000,
+          timerProgressBar: true,
+          toast: true
         });
         closeModal();
         emit('success');
@@ -272,7 +272,11 @@ const submit = () => {
           title: 'Error!',
           text: 'Failed to create user. Please try again.',
           icon: 'error',
-          confirmButtonText: 'OK'
+          position: 'top-end',
+          showConfirmButton: false,
+          timer: 4000,
+          timerProgressBar: true,
+          toast: true
         });
       }
     });

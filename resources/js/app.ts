@@ -5,6 +5,23 @@ import { resolvePageComponent } from 'laravel-vite-plugin/inertia-helpers';
 import type { DefineComponent } from 'vue';
 import { createApp, h } from 'vue';
 import { initializeTheme } from './composables/useAppearance';
+import axios from 'axios';
+
+// Configure axios globally
+axios.defaults.headers.common['X-Requested-With'] = 'XMLHttpRequest';
+axios.defaults.headers.common['X-CSRF-TOKEN'] = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+
+// Add response interceptor to handle CSRF token refresh
+axios.interceptors.response.use(
+    response => response,
+    error => {
+        if (error.response?.status === 419) {
+            // CSRF token mismatch, reload page to get new token
+            window.location.reload();
+        }
+        return Promise.reject(error);
+    }
+);
 
 const appName = import.meta.env.VITE_APP_NAME || 'Laravel';
 

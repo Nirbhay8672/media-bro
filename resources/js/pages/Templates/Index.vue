@@ -92,7 +92,11 @@ const deleteTemplate = (id: number) => {
                         title: 'Deleted!',
                         text: 'Template has been deleted successfully.',
                         icon: 'success',
-                        confirmButtonText: 'OK'
+                        position: 'top-end',
+                        showConfirmButton: false,
+                        timer: 3000,
+                        timerProgressBar: true,
+                        toast: true
                     });
                 },
                 onError: () => {
@@ -100,7 +104,11 @@ const deleteTemplate = (id: number) => {
                         title: 'Error!',
                         text: 'Failed to delete template. Please try again.',
                         icon: 'error',
-                        confirmButtonText: 'OK'
+                        position: 'top-end',
+                        showConfirmButton: false,
+                        timer: 4000,
+                        timerProgressBar: true,
+                        toast: true
                     });
                 }
             });

@@ -22,7 +22,7 @@ import { MoreHorizontal, Plus, Edit, Trash2, Eye } from 'lucide-vue-next';
 import { ref } from 'vue';
 import UserFormModal from '@/components/modals/user/UserFormModal.vue';
 import ViewUserModal from '@/components/modals/user/ViewUserModal.vue';
-import DeleteUserModal from '@/components/modals/user/DeleteUserModal.vue';
+import usersRoutes from '@/routes/users';
 import Swal from 'sweetalert2';
 
 interface Props {
@@ -39,7 +39,6 @@ const props = defineProps<Props>();
 
 const showUserFormModal = ref(false);
 const showViewModal = ref(false);
-const showDeleteModal = ref(false);
 const selectedUser = ref<User | null>(null);
 
 const breadcrumbItems: BreadcrumbItem[] = [
@@ -81,15 +80,51 @@ const openViewModal = (user: User) => {
     showViewModal.value = true;
 };
 
-const openDeleteModal = (user: User) => {
-    selectedUser.value = user;
-    showDeleteModal.value = true;
+const deleteUser = (user: User) => {
+    Swal.fire({
+        title: 'Are you sure?',
+        text: `You are about to delete ${user.name}. This action cannot be undone!`,
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#d33',
+        cancelButtonColor: '#3085d6',
+        confirmButtonText: 'Yes, delete it!',
+        cancelButtonText: 'Cancel'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            router.delete(usersRoutes.destroy.url(user.id), {
+                onSuccess: () => {
+                    Swal.fire({
+                        title: 'Deleted!',
+                        text: 'User has been deleted successfully.',
+                        icon: 'success',
+                        position: 'top-end',
+                        showConfirmButton: false,
+                        timer: 3000,
+                        timerProgressBar: true,
+                        toast: true
+                    });
+                },
+                onError: () => {
+                    Swal.fire({
+                        title: 'Error!',
+                        text: 'Failed to delete user. Please try again.',
+                        icon: 'error',
+                        position: 'top-end',
+                        showConfirmButton: false,
+                        timer: 4000,
+                        timerProgressBar: true,
+                        toast: true
+                    });
+                },
+            });
+        }
+    });
 };
 
 const closeModals = () => {
     showUserFormModal.value = false;
     showViewModal.value = false;
-    showDeleteModal.value = false;
     selectedUser.value = null;
 };
 
@@ -163,7 +198,7 @@ const refreshUsers = () => {
                                         </DropdownMenuItem>
                                         <DropdownMenuItem
                                             v-if="user.role !== 'super_admin'"
-                                            @click="openDeleteModal(user)"
+                                            @click="deleteUser(user)"
                                             class="text-destructive"
                                         >
                                             <Trash2 class="mr-2 h-4 w-4" />
@@ -200,13 +235,6 @@ const refreshUsers = () => {
             :is-open="showViewModal" 
             :user="selectedUser"
             @close="closeModals"
-        />
-        
-        <DeleteUserModal 
-            :is-open="showDeleteModal" 
-            :user="selectedUser"
-            @close="closeModals"
-            @success="refreshUsers"
         />
     </AppLayout>
 </template>
