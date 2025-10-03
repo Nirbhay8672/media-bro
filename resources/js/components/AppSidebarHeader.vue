@@ -15,14 +15,31 @@ withDefaults(
 
 <template>
     <header
-        class="flex h-16 shrink-0 items-center gap-2 border-b border-sidebar-border/70 px-6 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12 md:px-4 bg-gradient-to-r from-sidebar-background to-sidebar-accent/30"
+        class="flex h-16 shrink-0 items-center gap-2 border-b border-slate-700/60 dark:border-gray-600/60 px-6 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12 md:px-4 bg-gradient-to-r from-slate-800 via-gray-800 to-slate-900 dark:from-gray-800 dark:via-gray-700 dark:to-gray-900 shadow-xl"
     >
-        <div class="flex items-center gap-3">
-            <SidebarTrigger class="-ml-1 hover:bg-sidebar-accent/50 transition-colors rounded-md p-1" />
-            <div class="h-6 w-px bg-sidebar-border/50"></div>
+        <div class="flex items-center gap-4">
+            <SidebarTrigger class="-ml-1 hover:bg-slate-700/60 dark:hover:bg-gray-700/60 transition-all duration-300 p-2 group text-slate-200 dark:text-gray-300 hover:text-white dark:hover:text-gray-100 hover:scale-105" />
+            <div class="h-6 w-px bg-slate-600 dark:bg-gray-500"></div>
             <template v-if="breadcrumbs && breadcrumbs.length > 0">
                 <Breadcrumbs :breadcrumbs="breadcrumbs" />
             </template>
+        </div>
+        
+        <!-- Right side of header -->
+        <div class="ml-auto flex items-center">
+            <!-- Search bar -->
+            <div class="hidden md:flex items-center">
+                <div class="relative">
+                    <input
+                        type="text"
+                        placeholder="Search templates..."
+                        class="w-64 px-4 py-2 pl-10 text-sm border border-slate-600 dark:border-gray-500 bg-slate-700/50 dark:bg-gray-800/50 text-white placeholder-slate-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                    />
+                    <svg class="absolute left-3 top-2.5 h-4 w-4 text-slate-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                    </svg>
+                </div>
+            </div>
         </div>
     </header>
 </template>

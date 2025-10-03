@@ -39,7 +39,7 @@ const mainNavItems = computed((): NavItem[] => {
     // Add user management for super admins
     if (user.value?.role === 'super_admin') {
         items.push({
-            title: 'User Management',
+            title: 'Users',
             href: '/users',
             icon: Users,
         });
@@ -52,11 +52,11 @@ const footerNavItems: NavItem[] = [];
 </script>
 
 <template>
-    <Sidebar collapsible="icon" variant="inset" class="border-r border-sidebar-border/50">
-        <SidebarHeader class="border-b border-sidebar-border/30 bg-gradient-to-br from-sidebar-background to-sidebar-accent/20">
+    <Sidebar collapsible="icon" variant="inset" class="border-r border-slate-200/60 dark:border-slate-700/60 bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
+        <SidebarHeader class="border-b border-slate-700/60 dark:border-gray-600/60 bg-gradient-to-br from-slate-800 via-gray-800 to-slate-900 shadow-xl">
             <SidebarMenu>
                 <SidebarMenuItem>
-                    <SidebarMenuButton size="lg" as-child class="hover:bg-sidebar-accent/50 transition-colors">
+                    <SidebarMenuButton size="lg" as-child class="hover:bg-white/10 transition-all duration-200 mx-2 my-2">
                         <Link :href="dashboard()">
                             <AppLogo />
                         </Link>
@@ -65,13 +65,13 @@ const footerNavItems: NavItem[] = [];
             </SidebarMenu>
         </SidebarHeader>
 
-        <SidebarContent class="bg-gradient-to-b from-sidebar-background to-sidebar-accent/10">
-            <div class="px-3 py-4">
+        <SidebarContent class="bg-gradient-to-b from-slate-800/90 to-slate-900/90 dark:from-gray-800/90 dark:to-gray-900/90">
+            <div class="px-4 py-6 space-y-2">
                 <NavMain :items="mainNavItems" />
             </div>
         </SidebarContent>
 
-        <SidebarFooter class="border-t border-sidebar-border/30 bg-gradient-to-t from-sidebar-accent/20 to-sidebar-background">
+        <SidebarFooter class="border-t border-slate-700/60 dark:border-gray-600/60 bg-gradient-to-t from-slate-800/90 to-slate-900/90 dark:from-gray-800/90 dark:to-gray-900/90">
             <NavFooter :items="footerNavItems" />
             <NavUser />
         </SidebarFooter>
