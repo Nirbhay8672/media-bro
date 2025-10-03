@@ -16,7 +16,6 @@ import templates from '@/routes/templates';
 import { type NavItem } from '@/types';
 import { Link, usePage } from '@inertiajs/vue3';
 import { LayoutGrid, Image, Users } from 'lucide-vue-next';
-import AppLogo from './AppLogo.vue';
 import { computed } from 'vue';
 
 const page = usePage();
@@ -54,15 +53,7 @@ const footerNavItems: NavItem[] = [];
 <template>
     <Sidebar collapsible="icon" variant="inset" class="border-r border-slate-200/60 dark:border-slate-700/60 bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
         <SidebarHeader class="border-b border-slate-700/60 dark:border-gray-600/60 bg-gradient-to-br from-slate-800 via-gray-800 to-slate-900 shadow-xl">
-            <SidebarMenu>
-                <SidebarMenuItem>
-                    <SidebarMenuButton size="lg" as-child class="hover:bg-white/10 transition-all duration-200 mx-2 my-2">
-                        <Link :href="dashboard()">
-                            <AppLogo />
-                        </Link>
-                    </SidebarMenuButton>
-                </SidebarMenuItem>
-            </SidebarMenu>
+            <!-- Empty header - logo moved to navbar -->
         </SidebarHeader>
 
         <SidebarContent class="bg-gradient-to-b from-slate-800/90 to-slate-900/90 dark:from-gray-800/90 dark:to-gray-900/90">
