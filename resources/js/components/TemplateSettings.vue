@@ -94,65 +94,67 @@ const handleKeydown = (event: KeyboardEvent) => {
                 <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Template Settings</h2>
             </div>
             <div class="p-4">
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                <!-- Template Name -->
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        Template Name *
-                    </label>
-                    <input
-                        :value="form.name"
-                        @input="updateForm('name', ($event.target as HTMLInputElement).value)"
-                        type="text"
-                        required
-                        class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white transition-colors text-sm"
-                        placeholder="Enter template name"
-                    />
-                </div>
+                <div class="flex flex-wrap items-end gap-4">
+                    <!-- Template Name -->
+                    <div class="flex-1 min-w-[200px]">
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                            Template Name *
+                        </label>
+                        <input
+                            :value="form.name"
+                            @input="updateForm('name', ($event.target as HTMLInputElement).value)"
+                            type="text"
+                            required
+                            class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white transition-colors text-sm"
+                            placeholder="Enter template name"
+                        />
+                    </div>
 
-                <!-- Quick Templates -->
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        Quick Templates
-                    </label>
-                    <div class="relative quick-template-dropdown">
-                        <button
-                            type="button"
-                            @click="toggleQuickTemplateDropdown"
-                            class="w-full flex items-center justify-between px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                        >
-                            <span class="flex items-center">
-                                {{ selectedQuickTemplate ? selectedQuickTemplate.name : 'Select a template...' }}
-                                <span v-if="selectedQuickTemplate" class="text-xs text-gray-500 dark:text-gray-400 ml-2">
-                                    ({{ selectedQuickTemplate.width }} × {{ selectedQuickTemplate.height }}px)
-                                </span>
-                            </span>
-                            <ChevronDown class="h-4 w-4 text-gray-400" />
-                        </button>
-                        <div
-                            v-if="isQuickTemplateDropdownOpen"
-                            class="absolute z-10 w-full mt-1 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg shadow-lg"
-                        >
+                    <!-- Quick Templates -->
+                    <div class="flex-1 min-w-[200px]">
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                            Quick Templates
+                        </label>
+                        <div class="relative quick-template-dropdown">
                             <button
-                                v-for="template in quickTemplates"
-                                :key="template.name"
                                 type="button"
-                                @click="applyQuickTemplate(template)"
-                                class="w-full px-3 py-2 text-left hover:bg-gray-100 dark:hover:bg-gray-600 text-sm first:rounded-t-lg last:rounded-b-lg"
+                                @click="toggleQuickTemplateDropdown"
+                                class="w-full flex items-center justify-between px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                             >
-                                <div class="font-medium">{{ template.name }}</div>
-                                <div class="text-xs text-gray-500 dark:text-gray-400">
-                                    {{ template.width }} × {{ template.height }}px
-                                </div>
+                                <span class="flex items-center">
+                                    {{ selectedQuickTemplate ? selectedQuickTemplate.name : 'Select a template...' }}
+                                    <span v-if="selectedQuickTemplate" class="text-xs text-gray-500 dark:text-gray-400 ml-2">
+                                        ({{ selectedQuickTemplate.width }} × {{ selectedQuickTemplate.height }}px)
+                                    </span>
+                                </span>
+                                <ChevronDown class="h-4 w-4 text-gray-400" />
                             </button>
+                            <div
+                                v-if="isQuickTemplateDropdownOpen"
+                                class="absolute z-10 w-full mt-1 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg shadow-lg"
+                            >
+                                <button
+                                    v-for="template in quickTemplates"
+                                    :key="template.name"
+                                    type="button"
+                                    @click="applyQuickTemplate(template)"
+                                    class="w-full px-3 py-2 text-left hover:bg-gray-100 dark:hover:bg-gray-600 text-sm first:rounded-t-lg last:rounded-b-lg"
+                                >
+                                    <div class="font-medium">{{ template.name }}</div>
+                                    <div class="text-xs text-gray-500 dark:text-gray-400">
+                                        {{ template.width }} × {{ template.height }}px
+                                    </div>
+                                </button>
+                            </div>
                         </div>
                     </div>
-                </div>
 
-                <!-- Canvas Size -->
-                <div>
-                    <div class="grid grid-cols-2 gap-2">
+                    <!-- Canvas Size -->
+                    <div class="flex gap-2">
                         <div>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                Width
+                            </label>
                             <input
                                 :value="form.width"
                                 @input="updateForm('width', ($event.target as HTMLInputElement).value)"
@@ -160,11 +162,13 @@ const handleKeydown = (event: KeyboardEvent) => {
                                 min="100"
                                 max="4000"
                                 step="1"
-                                placeholder="Width"
-                                class="w-full px-2 py-1 border border-gray-300 dark:border-gray-600 rounded text-sm focus:ring-1 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+                                class="w-20 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white transition-colors text-sm"
                             />
                         </div>
                         <div>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                Height
+                            </label>
                             <input
                                 :value="form.height"
                                 @input="updateForm('height', ($event.target as HTMLInputElement).value)"
@@ -172,30 +176,27 @@ const handleKeydown = (event: KeyboardEvent) => {
                                 min="100"
                                 max="4000"
                                 step="1"
-                                placeholder="Height"
-                                class="w-full px-2 py-1 border border-gray-300 dark:border-gray-600 rounded text-sm focus:ring-1 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+                                class="w-20 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white transition-colors text-sm"
                             />
                         </div>
                     </div>
-                </div>
 
-                </div>
-
-                <!-- Create/Update Template Button -->
-                <div class="mt-4 flex justify-start">
-                    <button
-                        type="submit"
-                        :disabled="!form.name || isSubmitting"
-                        class="bg-blue-600 text-white py-2 px-6 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
-                    >
-                        <Loader2 v-if="isSubmitting" class="h-4 w-4 animate-spin" />
-                        <span>
-                            {{ isSubmitting 
-                                ? (isEditMode ? 'Updating...' : 'Creating...') 
-                                : (isEditMode ? 'Update Template' : 'Create Template') 
-                            }}
-                        </span>
-                    </button>
+                    <!-- Create/Update Template Button -->
+                    <div>
+                        <button
+                            type="submit"
+                            :disabled="!form.name || isSubmitting"
+                            class="bg-blue-600 text-white py-2 px-6 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+                        >
+                            <Loader2 v-if="isSubmitting" class="h-4 w-4 animate-spin" />
+                            <span>
+                                {{ isSubmitting 
+                                    ? (isEditMode ? 'Updating...' : 'Creating...') 
+                                    : (isEditMode ? 'Update Template' : 'Create Template') 
+                                }}
+                            </span>
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>

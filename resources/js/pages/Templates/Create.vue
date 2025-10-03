@@ -295,7 +295,17 @@ const applyQuickTemplate = (template: { name: string; width: number; height: num
 };
 
 const handleBackgroundImageChange = (file: File) => {
+    console.log('Background image file selected:', file);
     form.value.background_image = file;
+    
+    // Create preview URL
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        const result = e.target?.result as string;
+        console.log('Background image preview created:', result ? 'Yes' : 'No');
+        backgroundImagePreview.value = result;
+    };
+    reader.readAsDataURL(file);
 };
 
 const submitForm = async () => {

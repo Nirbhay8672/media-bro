@@ -104,10 +104,6 @@ const canvasStyle = computed(() => {
         height: props.form.height + 'px',
         transform: `scale(${scale})`,
         transformOrigin: 'top center',
-        backgroundImage: props.backgroundImagePreview ? `url(${props.backgroundImagePreview})` : 'none',
-        backgroundSize: 'cover',
-        backgroundPosition: 'center',
-        backgroundRepeat: 'no-repeat',
         maxWidth: '100%',
         maxHeight: '100%'
     };
@@ -334,7 +330,16 @@ const getImageClipPath = (shape: string) => {
                             @mouseup="handleMouseUp"
                         >
                             <!-- Background Image -->
-                            <div v-if="backgroundImagePreview" class="absolute inset-0 bg-cover bg-center bg-no-repeat" :style="{ backgroundImage: `url(${backgroundImagePreview})` }"></div>
+                            <div v-if="backgroundImagePreview" class="absolute inset-0 bg-cover bg-center bg-no-repeat z-0" :style="{ 
+                                backgroundImage: `url(${backgroundImagePreview})`,
+                                width: '100%',
+                                height: '100%'
+                            }"></div>
+                            
+                            <!-- Debug: Show background image status -->
+                            <div v-if="backgroundImagePreview" class="absolute top-2 left-2 bg-black bg-opacity-50 text-white text-xs px-2 py-1 rounded z-10">
+                                Background loaded
+                            </div>
 
                             <!-- Empty State -->
                             <div v-if="!backgroundImagePreview && canvasElements.length === 0" class="flex h-full w-full items-center justify-center">
