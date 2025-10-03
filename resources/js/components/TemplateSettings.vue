@@ -5,7 +5,6 @@ import { ChevronDown, Loader2, Upload } from 'lucide-vue-next';
 interface Props {
     form: {
         name: string;
-        description: string;
         width: number;
         height: number;
         background_image: File | null;
@@ -89,12 +88,13 @@ const handleKeydown = (event: KeyboardEvent) => {
 </script>
 
 <template>
-    <div class="w-full xl:w-80 flex-shrink-0">
+    <div class="w-full">
         <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
             <div class="p-4 border-b border-gray-200 dark:border-gray-700">
                 <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Template Settings</h2>
             </div>
-            <div class="p-4 space-y-3">
+            <div class="p-4">
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 <!-- Template Name -->
                 <div>
                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -108,20 +108,6 @@ const handleKeydown = (event: KeyboardEvent) => {
                         class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white transition-colors text-sm"
                         placeholder="Enter template name"
                     />
-                </div>
-
-                <!-- Description -->
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        Description
-                    </label>
-                    <textarea
-                        :value="form.description"
-                        @input="updateForm('description', ($event.target as HTMLTextAreaElement).value)"
-                        rows="3"
-                        class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white transition-colors resize-none text-sm"
-                        placeholder="Describe your template"
-                    ></textarea>
                 </div>
 
                 <!-- Quick Templates -->
@@ -165,14 +151,8 @@ const handleKeydown = (event: KeyboardEvent) => {
 
                 <!-- Canvas Size -->
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        Canvas Size
-                    </label>
                     <div class="grid grid-cols-2 gap-2">
                         <div>
-                            <label class="block text-xs text-gray-500 dark:text-gray-400 mb-1">
-                                Width
-                            </label>
                             <input
                                 :value="form.width"
                                 @input="updateForm('width', ($event.target as HTMLInputElement).value)"
@@ -180,13 +160,11 @@ const handleKeydown = (event: KeyboardEvent) => {
                                 min="100"
                                 max="4000"
                                 step="1"
+                                placeholder="Width"
                                 class="w-full px-2 py-1 border border-gray-300 dark:border-gray-600 rounded text-sm focus:ring-1 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
                             />
                         </div>
                         <div>
-                            <label class="block text-xs text-gray-500 dark:text-gray-400 mb-1">
-                                Height
-                            </label>
                             <input
                                 :value="form.height"
                                 @input="updateForm('height', ($event.target as HTMLInputElement).value)"
@@ -194,51 +172,31 @@ const handleKeydown = (event: KeyboardEvent) => {
                                 min="100"
                                 max="4000"
                                 step="1"
+                                placeholder="Height"
                                 class="w-full px-2 py-1 border border-gray-300 dark:border-gray-600 rounded text-sm focus:ring-1 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
                             />
                         </div>
                     </div>
                 </div>
 
-                <!-- Background -->
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        Background
-                    </label>
-                    <div class="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-4 text-center">
-                        <input
-                            type="file"
-                            accept="image/*"
-                            @change="handleBackgroundImageChange"
-                            class="hidden"
-                            id="background-upload"
-                        />
-                        <label for="background-upload" class="cursor-pointer">
-                            <Upload class="mx-auto h-8 w-8 text-gray-400 mb-2" />
-                            <p class="text-sm text-gray-600 dark:text-gray-400">
-                                {{ backgroundImagePreview ? 'Change Background' : 'Upload Image' }}
-                            </p>
-                        </label>
-                        <div v-if="backgroundImagePreview" class="mt-2">
-                            <img :src="backgroundImagePreview" alt="Background preview" class="mx-auto h-16 w-16 object-cover rounded" />
-                        </div>
-                    </div>
                 </div>
 
                 <!-- Create/Update Template Button -->
-                <button
-                    type="submit"
-                    :disabled="!form.name || isSubmitting"
-                    class="w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
-                >
-                    <Loader2 v-if="isSubmitting" class="h-4 w-4 animate-spin" />
-                    <span>
-                        {{ isSubmitting 
-                            ? (isEditMode ? 'Updating...' : 'Creating...') 
-                            : (isEditMode ? 'Update Template' : 'Create Template') 
-                        }}
-                    </span>
-                </button>
+                <div class="mt-4 flex justify-start">
+                    <button
+                        type="submit"
+                        :disabled="!form.name || isSubmitting"
+                        class="bg-blue-600 text-white py-2 px-6 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+                    >
+                        <Loader2 v-if="isSubmitting" class="h-4 w-4 animate-spin" />
+                        <span>
+                            {{ isSubmitting 
+                                ? (isEditMode ? 'Updating...' : 'Creating...') 
+                                : (isEditMode ? 'Update Template' : 'Create Template') 
+                            }}
+                        </span>
+                    </button>
+                </div>
             </div>
         </div>
     </div>

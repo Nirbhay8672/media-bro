@@ -16,7 +16,6 @@ const props = defineProps<{
     template?: {
         id: number;
         name: string;
-        description?: string;
         width: number;
         height: number;
         background_image?: string;
@@ -48,7 +47,6 @@ const breadcrumbs = computed<BreadcrumbItem[]>(() => [
 
 const form = ref({
     name: '',
-    description: '',
     width: 800,
     height: 600,
     background_image: null as File | null,
@@ -60,7 +58,6 @@ const backgroundImagePreview = ref<string | null>(null);
 onMounted(() => {
     if (isEditMode.value && props.template) {
         form.value.name = props.template.name;
-        form.value.description = props.template.description || '';
         form.value.width = props.template.width;
         form.value.height = props.template.height;
         
@@ -328,7 +325,6 @@ const submitForm = async () => {
         // Create FormData for file upload
         const formDataObj = new FormData();
         formDataObj.append('name', form.value.name);
-        formDataObj.append('description', form.value.description);
         formDataObj.append('width', form.value.width.toString());
         formDataObj.append('height', form.value.height.toString());
         formDataObj.append('canvas_data', JSON.stringify(canvasElements.value));
@@ -423,9 +419,9 @@ const handleKeydown = (event: KeyboardEvent) => {
         <div class="min-h-screen bg-gray-50 dark:bg-gray-900" @click="closeDropdownOnOutsideClick" @keydown="handleKeydown">
             <!-- Main Content -->
             <div class="w-full px-2 sm:px-4 py-4">
-                <form @submit.prevent="submitForm" class="flex flex-col xl:flex-row gap-2 sm:gap-4">
-                    <!-- Left Sidebar - Template Settings -->
-                    <div class="w-full xl:w-80 flex-shrink-0 order-1 xl:order-1">
+                <form @submit.prevent="submitForm" class="space-y-6">
+                    <!-- First Row - Template Settings (Full Width) -->
+                    <div class="w-full">
                         <TemplateSettings
                             v-model:form="form"
                             v-model:backgroundImagePreview="backgroundImagePreview"
@@ -438,43 +434,47 @@ const handleKeydown = (event: KeyboardEvent) => {
                         />
                     </div>
 
-                    <!-- Center - Canvas Editor with Tools & Properties -->
-                    <div class="flex-1 min-w-0 order-2 xl:order-2">
-                        <CanvasEditor
-                            :form="form"
-                            :backgroundImagePreview="backgroundImagePreview"
-                            :canvasElements="canvasElements"
-                            :selectedElement="selectedElement"
-                            :selectedTool="selectedTool"
-                            @canvasClick="handleCanvasClick"
-                            @elementMouseDown="handleElementMouseDown"
-                            @mouseMove="handleMouseMove"
-                            @mouseUp="handleMouseUp"
-                            @selectElement="selectElement"
-                            @bringToFront="bringToFront"
-                            @sendToBack="sendToBack"
-                            @duplicateElement="duplicateElement"
-                            @deleteElement="deleteElement"
-                            @resizeElement="handleResizeElement"
-                        >
-                            <!-- Tools & Properties inside Canvas Editor -->
-                            <div class="absolute top-4 right-4 z-10 space-y-3 max-w-xs">
-                                <!-- Tools -->
-                                <ToolsPanel
-                                    v-model:selectedTool="selectedTool"
-                                />
+                    <!-- Second Row - Template Editor and Tools -->
+                    <div class="flex flex-col xl:flex-row gap-4">
+                        <!-- Canvas Editor -->
+                        <div class="flex-1 min-w-0">
+                            <CanvasEditor
+                                :form="form"
+                                :backgroundImagePreview="backgroundImagePreview"
+                                :canvasElements="canvasElements"
+                                :selectedElement="selectedElement"
+                                :selectedTool="selectedTool"
+                                @canvasClick="handleCanvasClick"
+                                @elementMouseDown="handleElementMouseDown"
+                                @mouseMove="handleMouseMove"
+                                @mouseUp="handleMouseUp"
+                                @selectElement="selectElement"
+                                @bringToFront="bringToFront"
+                                @sendToBack="sendToBack"
+                                @duplicateElement="duplicateElement"
+                                @deleteElement="deleteElement"
+                                @resizeElement="handleResizeElement"
+                                @backgroundImageChange="handleBackgroundImageChange"
+                            />
+                        </div>
 
-                                <!-- Element Properties -->
-                                <PropertiesPanel
-                                    :selectedElement="selectedElement"
-                                    @updateElement="updateElementProperty"
-                                    @bringToFront="bringToFront"
-                                    @sendToBack="sendToBack"
-                                    @duplicateElement="duplicateElement"
-                                    @deleteElement="deleteElement"
-                                />
-                            </div>
-                        </CanvasEditor>
+                        <!-- Tools & Properties Sidebar -->
+                        <div class="w-full xl:w-80 flex-shrink-0 space-y-4">
+                            <!-- Tools -->
+                            <ToolsPanel
+                                v-model:selectedTool="selectedTool"
+                            />
+
+                            <!-- Element Properties -->
+                            <PropertiesPanel
+                                :selectedElement="selectedElement"
+                                @updateElement="updateElementProperty"
+                                @bringToFront="bringToFront"
+                                @sendToBack="sendToBack"
+                                @duplicateElement="duplicateElement"
+                                @deleteElement="deleteElement"
+                            />
+                        </div>
                     </div>
                 </form>
             </div>

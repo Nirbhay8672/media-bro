@@ -60,10 +60,20 @@ interface Emits {
     (e: 'duplicateElement', elementId: string): void;
     (e: 'deleteElement', elementId: string): void;
     (e: 'resizeElement', elementId: string, width: number, height: number, x: number, y: number, fontSize?: number): void;
+    (e: 'backgroundImageChange', file: File): void;
 }
 
 const props = defineProps<Props>();
 const emit = defineEmits<Emits>();
+
+// Handle background image change
+const handleBackgroundImageChange = (event: Event) => {
+    const target = event.target as HTMLInputElement;
+    const file = target.files?.[0];
+    if (file) {
+        emit('backgroundImageChange', file);
+    }
+};
 
 // Window width for responsive design
 const windowWidth = ref(typeof window !== 'undefined' ? window.innerWidth : 1024);
@@ -249,49 +259,66 @@ const getImageClipPath = (shape: string) => {
                 <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Template Editor</h2>
             </div>
 
-            <!-- Quick Actions Toolbar -->
+            <!-- Background Selection and Actions -->
             <div class="px-4 py-2 border-b border-gray-200 dark:border-gray-700">
                 <div class="flex items-center justify-between">
-                    <div class="flex items-center gap-2">
+                    <!-- Background Upload -->
+                    <div class="flex items-center gap-3">
+                        <input
+                            type="file"
+                            accept="image/*"
+                            @change="handleBackgroundImageChange"
+                            class="hidden"
+                            id="background-upload"
+                        />
+                        <label for="background-upload" class="cursor-pointer inline-flex items-center gap-2 px-3 py-1.5 text-xs font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors">
+                            <Upload class="h-3 w-3" />
+                            Background
+                        </label>
+                        <div v-if="backgroundImagePreview" class="flex items-center gap-2">
+                            <img :src="backgroundImagePreview" alt="Background preview" class="h-6 w-6 object-cover rounded" />
+                            <span class="text-xs text-gray-500 dark:text-gray-400">Background set</span>
+                        </div>
+                    </div>
+                    
+                    <!-- Vertical Action Buttons -->
+                    <div class="flex items-center gap-1">
                         <button
                             type="button"
                             @click="selectedElement && bringToFront(selectedElement.id)"
                             :disabled="!selectedElement"
-                            class="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                            title="Bring to Front"
+                            class="p-2 text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                         >
-                            <Layers class="h-3 w-3" />
-                            Bring to Front
+                            <Layers class="h-4 w-4" />
                         </button>
                         <button
                             type="button"
                             @click="selectedElement && sendToBack(selectedElement.id)"
                             :disabled="!selectedElement"
-                            class="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                            title="Send to Back"
+                            class="p-2 text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                         >
-                            <Layers class="h-3 w-3 rotate-180" />
-                            Send to Back
+                            <Layers class="h-4 w-4 rotate-180" />
                         </button>
                         <button
                             type="button"
                             @click="selectedElement && duplicateElement(selectedElement.id)"
                             :disabled="!selectedElement"
-                            class="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                            title="Duplicate"
+                            class="p-2 text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                         >
-                            <Copy class="h-3 w-3" />
-                            Duplicate
+                            <Copy class="h-4 w-4" />
                         </button>
                         <button
                             type="button"
                             @click="selectedElement && deleteElement(selectedElement.id)"
                             :disabled="!selectedElement"
-                            class="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-red-700 dark:text-red-300 bg-red-100 dark:bg-red-900 rounded-lg hover:bg-red-200 dark:hover:bg-red-800 disabled:opacity-50 disabled:cursor-not-allowed"
+                            title="Delete"
+                            class="p-2 text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/30 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                         >
-                            <Trash2 class="h-3 w-3" />
-                            Delete
+                            <Trash2 class="h-4 w-4" />
                         </button>
-                    </div>
-                    <div class="text-sm text-gray-500 dark:text-gray-400">
-                        {{ canvasElements.length }} element{{ canvasElements.length !== 1 ? 's' : '' }}
                     </div>
                 </div>
             </div>
