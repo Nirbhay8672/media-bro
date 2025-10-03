@@ -34,6 +34,5 @@ const showAvatar = computed(
         <span v-if="showEmail" class="truncate text-xs text-slate-400 dark:text-gray-400">{{
             user.email
         }}</span>
-        <span v-else class="truncate text-xs text-slate-400 dark:text-gray-400 capitalize">{{ user.role?.replace('_', ' ') }}</span>
     </div>
 </template>
