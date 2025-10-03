@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed , ref } from 'vue';
+import { computed, ref, onMounted, onUnmounted } from 'vue';
 import { Upload, Layers, Copy, Trash2 } from 'lucide-vue-next';
 
 interface CanvasElement {
@@ -65,10 +65,26 @@ interface Emits {
 const props = defineProps<Props>();
 const emit = defineEmits<Emits>();
 
+// Window width for responsive design
+const windowWidth = ref(typeof window !== 'undefined' ? window.innerWidth : 1024);
+
+// Update window width on resize
+const updateWindowWidth = () => {
+    windowWidth.value = window.innerWidth;
+};
+
+onMounted(() => {
+    window.addEventListener('resize', updateWindowWidth);
+});
+
+onUnmounted(() => {
+    window.removeEventListener('resize', updateWindowWidth);
+});
+
 const canvasStyle = computed(() => {
     // Calculate scale to fit within viewport while maintaining aspect ratio
-    const maxWidth = 800;
-    const maxHeight = 600;
+    const maxWidth = windowWidth.value < 1024 ? 400 : 600; // Smaller on mobile/tablet
+    const maxHeight = windowWidth.value < 1024 ? 300 : 450; // Smaller on mobile/tablet
     const scaleX = maxWidth / props.form.width;
     const scaleY = maxHeight / props.form.height;
     const scale = Math.min(scaleX, scaleY, 1); // Don't scale up
@@ -81,7 +97,9 @@ const canvasStyle = computed(() => {
         backgroundImage: props.backgroundImagePreview ? `url(${props.backgroundImagePreview})` : 'none',
         backgroundSize: 'cover',
         backgroundPosition: 'center',
-        backgroundRepeat: 'no-repeat'
+        backgroundRepeat: 'no-repeat',
+        maxWidth: '100%',
+        maxHeight: '100%'
     };
 });
 
@@ -224,8 +242,8 @@ const getImageClipPath = (shape: string) => {
 </script>
 
 <template>
-    <div class="flex-1 min-w-0">
-        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 flex flex-col">
+    <div class="flex-1 min-w-0 relative">
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 flex flex-col relative">
             <!-- Canvas Editor Header -->
             <div class="pt-5 px-4 pb-2 border-b border-gray-200 dark:border-gray-700">
                 <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Template Editor</h2>
@@ -278,11 +296,11 @@ const getImageClipPath = (shape: string) => {
                 </div>
             </div>
 
-            <div class="p-4 flex justify-center items-start min-h-[400px]">
-                <div class="relative" style="margin: 20px 0;">
+            <div class="p-2 sm:p-4 flex justify-center items-start min-h-[300px] sm:min-h-[400px]">
+                <div class="relative w-full max-w-full overflow-hidden" style="margin: 10px 0;">
                         <!-- Canvas -->
                         <div
-                            class="relative overflow-hidden border-2 border-gray-300 bg-gray-50 dark:border-gray-600 dark:bg-gray-700 shadow-lg rounded-lg cursor-crosshair"
+                            class="relative overflow-hidden border-2 border-gray-300 bg-gray-50 dark:border-gray-600 dark:bg-gray-700 shadow-lg rounded-lg cursor-crosshair mx-auto"
                             :style="canvasStyle"
                             @click="handleCanvasClick"
                             @mousemove="handleMouseMove"
@@ -398,6 +416,9 @@ const getImageClipPath = (shape: string) => {
                     </div>
                 </div>
             </div>
+            
+            <!-- Slot for Tools & Properties -->
+            <slot />
         </div>
 </template>
 

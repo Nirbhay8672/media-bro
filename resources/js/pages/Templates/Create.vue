@@ -420,59 +420,61 @@ const handleKeydown = (event: KeyboardEvent) => {
     <Head :title="isEditMode ? 'Edit Template' : 'Create Template'" />
 
     <AppLayout :breadcrumbs="breadcrumbs">
-        <div class="h-screen bg-gray-50 dark:bg-gray-900 overflow-hidden" @click="closeDropdownOnOutsideClick" @keydown="handleKeydown">
+        <div class="min-h-screen bg-gray-50 dark:bg-gray-900" @click="closeDropdownOnOutsideClick" @keydown="handleKeydown">
             <!-- Main Content -->
-            <div class="w-full px-4 py-4">
-                <form @submit.prevent="submitForm" class="flex gap-4">
+            <div class="w-full px-2 sm:px-4 py-4">
+                <form @submit.prevent="submitForm" class="flex flex-col xl:flex-row gap-2 sm:gap-4">
                     <!-- Left Sidebar - Template Settings -->
-                    <TemplateSettings
-                        v-model:form="form"
-                        v-model:backgroundImagePreview="backgroundImagePreview"
-                        v-model:selectedQuickTemplate="selectedQuickTemplate"
-                        v-model:isQuickTemplateDropdownOpen="isQuickTemplateDropdownOpen"
-                        :is-edit-mode="isEditMode"
-                        :is-submitting="isSubmitting"
-                        @backgroundImageChange="handleBackgroundImageChange"
-                        @applyQuickTemplate="applyQuickTemplate"
-                    />
+                    <div class="w-full xl:w-80 flex-shrink-0 order-1 xl:order-1">
+                        <TemplateSettings
+                            v-model:form="form"
+                            v-model:backgroundImagePreview="backgroundImagePreview"
+                            v-model:selectedQuickTemplate="selectedQuickTemplate"
+                            v-model:isQuickTemplateDropdownOpen="isQuickTemplateDropdownOpen"
+                            :is-edit-mode="isEditMode"
+                            :is-submitting="isSubmitting"
+                            @backgroundImageChange="handleBackgroundImageChange"
+                            @applyQuickTemplate="applyQuickTemplate"
+                        />
+                    </div>
 
-                    <!-- Center - Canvas Editor -->
-                    <CanvasEditor
-                        :form="form"
-                        :backgroundImagePreview="backgroundImagePreview"
-                        :canvasElements="canvasElements"
-                        :selectedElement="selectedElement"
-                        :selectedTool="selectedTool"
-                        @canvasClick="handleCanvasClick"
-                        @elementMouseDown="handleElementMouseDown"
-                        @mouseMove="handleMouseMove"
-                        @mouseUp="handleMouseUp"
-                        @selectElement="selectElement"
-                        @bringToFront="bringToFront"
-                        @sendToBack="sendToBack"
-                        @duplicateElement="duplicateElement"
-                        @deleteElement="deleteElement"
-                        @resizeElement="handleResizeElement"
-                    />
+                    <!-- Center - Canvas Editor with Tools & Properties -->
+                    <div class="flex-1 min-w-0 order-2 xl:order-2">
+                        <CanvasEditor
+                            :form="form"
+                            :backgroundImagePreview="backgroundImagePreview"
+                            :canvasElements="canvasElements"
+                            :selectedElement="selectedElement"
+                            :selectedTool="selectedTool"
+                            @canvasClick="handleCanvasClick"
+                            @elementMouseDown="handleElementMouseDown"
+                            @mouseMove="handleMouseMove"
+                            @mouseUp="handleMouseUp"
+                            @selectElement="selectElement"
+                            @bringToFront="bringToFront"
+                            @sendToBack="sendToBack"
+                            @duplicateElement="duplicateElement"
+                            @deleteElement="deleteElement"
+                            @resizeElement="handleResizeElement"
+                        >
+                            <!-- Tools & Properties inside Canvas Editor -->
+                            <div class="absolute top-4 right-4 z-10 space-y-3 max-w-xs">
+                                <!-- Tools -->
+                                <ToolsPanel
+                                    v-model:selectedTool="selectedTool"
+                                />
 
-                    <!-- Right Sidebar - Tools & Properties -->
-                    <div class="w-72 flex-shrink-0">
-                        <div class="space-y-3">
-                            <!-- Tools -->
-                            <ToolsPanel
-                                v-model:selectedTool="selectedTool"
-                            />
-
-                            <!-- Element Properties -->
-                            <PropertiesPanel
-                                :selectedElement="selectedElement"
-                                @updateElement="updateElementProperty"
-                                @bringToFront="bringToFront"
-                                @sendToBack="sendToBack"
-                                @duplicateElement="duplicateElement"
-                                @deleteElement="deleteElement"
-                            />
-                        </div>
+                                <!-- Element Properties -->
+                                <PropertiesPanel
+                                    :selectedElement="selectedElement"
+                                    @updateElement="updateElementProperty"
+                                    @bringToFront="bringToFront"
+                                    @sendToBack="sendToBack"
+                                    @duplicateElement="duplicateElement"
+                                    @deleteElement="deleteElement"
+                                />
+                            </div>
+                        </CanvasEditor>
                     </div>
                 </form>
             </div>

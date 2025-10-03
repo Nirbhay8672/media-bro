@@ -121,18 +121,18 @@ const getCheckboxChecked = (event: Event): boolean => {
 </script>
 
 <template>
-    <div v-if="selectedElement" class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
-        <div class="p-4">
-            <h2 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Properties</h2>
+    <div v-if="selectedElement" class="bg-white/95 dark:bg-gray-800/95 backdrop-blur-sm rounded-lg shadow-lg border border-gray-200/60 dark:border-gray-700/60">
+        <div class="p-3">
+            <h2 class="text-sm font-semibold text-gray-900 dark:text-white mb-3">Properties</h2>
             
             <!-- Properties Tabs -->
-            <div class="mb-4">
-                <div class="flex space-x-1 bg-gray-100 dark:bg-gray-700 rounded-lg p-1">
+            <div class="mb-3">
+                <div class="flex space-x-1 bg-gray-100 dark:bg-gray-700 rounded-md p-1">
                     <button
                         type="button"
                         @click="activePropertyTab = 'content'"
                         :class="[
-                            'flex-1 px-3 py-2 text-xs font-medium rounded-md transition-colors',
+                            'flex-1 px-2 py-1.5 text-xs font-medium rounded transition-colors',
                             activePropertyTab === 'content' 
                                 ? 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white shadow-sm' 
                                 : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
@@ -144,7 +144,7 @@ const getCheckboxChecked = (event: Event): boolean => {
                         type="button"
                         @click="activePropertyTab = 'style'"
                         :class="[
-                            'flex-1 px-3 py-2 text-xs font-medium rounded-md transition-colors',
+                            'flex-1 px-2 py-1.5 text-xs font-medium rounded transition-colors',
                             activePropertyTab === 'style' 
                                 ? 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white shadow-sm' 
                                 : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
@@ -156,7 +156,7 @@ const getCheckboxChecked = (event: Event): boolean => {
                         type="button"
                         @click="activePropertyTab = 'position'"
                         :class="[
-                            'flex-1 px-3 py-2 text-xs font-medium rounded-md transition-colors',
+                            'flex-1 px-2 py-1.5 text-xs font-medium rounded transition-colors',
                             activePropertyTab === 'position' 
                                 ? 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white shadow-sm' 
                                 : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
