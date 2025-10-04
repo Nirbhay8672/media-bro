@@ -71,6 +71,16 @@ class VisitorTrackingService
             }
 
             $ipAddress = $this->getClientIpAddress($request);
+            
+            // Check if this IP has already downloaded this template
+            $existingDownload = TemplateDownload::where('template_id', $template->id)
+                ->where('ip_address', $ipAddress)
+                ->first();
+
+            if ($existingDownload) {
+                return; // Don't track duplicate downloads
+            }
+
             $userAgent = $request->userAgent();
             $username = $this->getUsernameFromRequest($request);
             $locationData = $this->getLocationFromIp($ipAddress);
@@ -97,7 +107,7 @@ class VisitorTrackingService
         } catch (\Exception $e) {
             Log::error('Failed to track template download', [
                 'template_id' => $template->id,
-                'ip_address' => $request->ip(),
+                'ip_address' => $this->getClientIpAddress($request),
                 'file_name' => $fileName,
                 'error' => $e->getMessage()
             ]);
@@ -117,18 +127,39 @@ class VisitorTrackingService
             'REMOTE_ADDR'                // Standard
         ];
 
+        $fullIp = null;
         foreach ($headers as $header) {
             if ($request->server($header)) {
                 $ips = explode(',', $request->server($header));
                 $ip = trim($ips[0]);
                 
                 if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE)) {
-                    return $ip;
+                    $fullIp = $ip;
+                    break;
                 }
             }
         }
 
-        return $request->ip() ?? '127.0.0.1';
+        if (!$fullIp) {
+            $fullIp = $request->ip() ?? '127.0.0.1';
+        }
+
+        // Format IP to first 3 octets (152.26.25 format)
+        return $this->formatIpToThreeOctets($fullIp);
+    }
+
+    private function formatIpToThreeOctets(string $ipAddress): string
+    {
+        // Split IP address into octets
+        $octets = explode('.', $ipAddress);
+        
+        // If it's a valid IPv4 address with 4 octets, return first 3
+        if (count($octets) === 4 && filter_var($ipAddress, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)) {
+            return $octets[0] . '.' . $octets[1] . '.' . $octets[2];
+        }
+        
+        // For IPv6 or invalid IPs, return a default format
+        return '127.0.0';
     }
 
     private function getUsernameFromRequest(Request $request): ?string
@@ -146,8 +177,8 @@ class VisitorTrackingService
 
     private function getLocationFromIp(string $ipAddress): array
     {
-        // Skip local IPs
-        if ($this->isLocalIp($ipAddress)) {
+        // Skip local IPs and 3-octet format (can't get location for partial IP)
+        if ($this->isLocalIp($ipAddress) || $this->isThreeOctetFormat($ipAddress)) {
             return [];
         }
 
@@ -178,4 +209,12 @@ class VisitorTrackingService
     {
         return filter_var($ipAddress, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE) === false;
     }
+
+    private function isThreeOctetFormat(string $ipAddress): bool
+    {
+        // Check if IP is in 3-octet format (e.g., 152.26.25)
+        $octets = explode('.', $ipAddress);
+        return count($octets) === 3;
+    }
 }
+
