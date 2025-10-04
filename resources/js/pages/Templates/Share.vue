@@ -274,21 +274,38 @@ const generateImage = async () => {
             throw new Error('Preview container not found');
         }
 
-        // Use dom-to-image for maximum quality
-        const dataUrl = await domtoimage.toPng(previewElement, {
-            quality: 1.0,
-            bgcolor: '#ffffff',
-            width: previewElement.offsetWidth * 2, // 2x resolution for crisp quality
-            height: previewElement.offsetHeight * 2, // 2x resolution for crisp quality
-            style: {
-                transform: 'scale(2)', // Scale up for high resolution
-                transformOrigin: 'top left',
-                imageRendering: 'crisp-edges', // Better text rendering
-                textRendering: 'optimizeLegibility' // Better text quality
-            },
-            pixelRatio: 2, // High DPI support
-            cacheBust: true // Ensure fresh rendering
+        console.log('Preview element found:', previewElement);
+        console.log('Element dimensions:', {
+            width: previewElement.offsetWidth,
+            height: previewElement.offsetHeight
         });
+
+        // Use dom-to-image with optimized settings for reliability
+        let dataUrl;
+        try {
+            dataUrl = await domtoimage.toPng(previewElement, {
+                quality: 1.0,
+                bgcolor: '#ffffff',
+                width: previewElement.offsetWidth,
+                height: previewElement.offsetHeight,
+                style: {
+                    transform: 'scale(1)',
+                    transformOrigin: 'top left'
+                },
+                pixelRatio: 2, // High DPI support for better quality
+                cacheBust: true // Ensure fresh rendering
+            });
+        } catch (domError) {
+            console.warn('dom-to-image failed, trying fallback method:', domError);
+            
+            // Fallback: Try with simpler settings
+            dataUrl = await domtoimage.toPng(previewElement, {
+                quality: 1.0,
+                bgcolor: '#ffffff'
+            });
+        }
+
+        console.log('Image generated successfully, data URL length:', dataUrl.length);
 
         // Create download link with timestamp
         const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
@@ -342,10 +359,23 @@ const generateImage = async () => {
         
         // Close loading and show error
         Swal.close();
+        
+        // Provide more specific error messages
+        let errorMessage = 'Unknown error occurred while generating image.';
+        if (error.message) {
+            errorMessage = error.message;
+        } else if (error.name === 'SecurityError') {
+            errorMessage = 'Security error: Cannot access the preview element. Please try refreshing the page.';
+        } else if (error.name === 'InvalidStateError') {
+            errorMessage = 'Invalid state error: The preview element may not be ready. Please try again.';
+        } else if (error.toString().includes('canvas')) {
+            errorMessage = 'Canvas rendering error: Please check if all images are loaded and try again.';
+        }
+        
         Swal.fire({
             icon: 'error',
             title: 'Download Failed',
-            text: error.message || 'Unknown error occurred while generating image.',
+            text: errorMessage,
             confirmButtonText: 'Try Again'
         });
     } finally {
