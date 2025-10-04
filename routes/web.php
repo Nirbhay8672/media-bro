@@ -58,14 +58,24 @@ Route::get('test-assets', function () {
 
 // Dashboard (requires auth + email verification)
 Route::get('dashboard', function () {
-    $templates = \App\Models\Template::where('user_id', auth()->id())
+    $user = auth()->user();
+    $templates = \App\Models\Template::where('user_id', $user->id)
         ->orderBy('created_at', 'desc')
         ->limit(6)
         ->get();
 
-    return Inertia::render('Dashboard', [
-        'templates' => $templates
-    ]);
+    $data = [
+        'templates' => $templates,
+        'template_count' => \App\Models\Template::where('user_id', $user->id)->count(),
+    ];
+
+    // Add superadmin-specific data
+    if ($user->isSuperAdmin()) {
+        $data['user_count'] = \App\Models\User::count();
+        $data['total_template_count'] = \App\Models\Template::count();
+    }
+
+    return Inertia::render('Dashboard', $data);
 })->middleware(['auth', 'verified'])->name('dashboard');
 
 // ============================================================================
