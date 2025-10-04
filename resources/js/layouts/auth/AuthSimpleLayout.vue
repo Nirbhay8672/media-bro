@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import AppLogoIcon from '@/components/AppLogoIcon.vue';
 import { home } from '@/routes';
-import { Link } from '@inertiajs/vue3';
+import { Link, usePage } from '@inertiajs/vue3';
+
+const page = usePage();
 
 defineProps<{
     title?: string;
@@ -24,7 +26,7 @@ defineProps<{
                             class="mb-1 flex h-20 w-20 items-center justify-center rounded-xl bg-white shadow-xl p-3 border border-gray-100"
                         >
                             <img
-                                src="/images/logo.png"
+                                :src="page.props.logo_url || '/images/logo.png'"
                                 alt="Media Bro Logo"
                                 class="h-14 w-14 object-contain"
                             />

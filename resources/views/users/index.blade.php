@@ -14,7 +14,7 @@
             <div class="col-md-3 col-lg-2 d-md-block bg-dark sidebar collapse">
                 <div class="position-sticky pt-3">
                     <div class="text-center mb-4">
-                        <img src="/images/logo.png" alt="Media Bro" class="img-fluid" style="max-height: 40px;">
+                        <img src="{{ asset('images/logo.png') }}" alt="Media Bro" class="img-fluid" style="max-height: 40px;">
                         <h5 class="text-white mt-2">Media Bro</h5>
                     </div>
                     <ul class="nav flex-column">

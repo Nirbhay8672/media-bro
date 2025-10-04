@@ -1,12 +1,14 @@
 <script setup lang="ts">
-// No imports needed for image logo
+import { usePage } from '@inertiajs/vue3';
+
+const page = usePage();
 </script>
 
 <template>
     <div class="flex items-center gap-4">
         <div class="flex aspect-square size-12 items-center justify-center overflow-hidden bg-white rounded-lg p-1">
             <img 
-                src="/images/logo.png" 
+                :src="page.props.logo_url || '/images/logo.png'" 
                 alt="Media Bro Logo" 
                 class="w-full h-full object-contain"
             />
