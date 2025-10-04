@@ -181,7 +181,20 @@ class User extends Authenticatable
             'subscription_end_date' => $endDate,
         ]);
 
-        // Update account status based on new subscription dates
-        $this->updateAccountStatusBasedOnSubscription();
+        // Refresh the model to get updated dates
+        $this->refresh();
+
+        // Check if the new subscription is valid (not expired)
+        $now = now()->toDateString();
+        $isSubscriptionValid = $now >= $this->subscription_start_date->toDateString() && 
+                              $now <= $this->subscription_end_date->toDateString();
+
+        // If subscription is valid, activate the account
+        if ($isSubscriptionValid) {
+            $this->activateAccount();
+        } else {
+            // If subscription is expired, deactivate the account
+            $this->deactivateAccount();
+        }
     }
 }

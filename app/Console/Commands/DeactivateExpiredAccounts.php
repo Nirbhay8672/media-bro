@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use App\Models\User;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\Log;
 
 class DeactivateExpiredAccounts extends Command
 {
@@ -12,7 +13,7 @@ class DeactivateExpiredAccounts extends Command
      *
      * @var string
      */
-    protected $signature = 'users:deactivate-expired';
+    protected $signature = 'users:deactivate-expired {--quiet : Suppress output}';
 
     /**
      * The console command description.
@@ -26,7 +27,11 @@ class DeactivateExpiredAccounts extends Command
      */
     public function handle()
     {
-        $this->info('Checking for expired accounts...');
+        $quiet = $this->option('quiet');
+
+        if (!$quiet) {
+            $this->info('Checking for expired accounts...');
+        }
 
         $expiredUsers = User::where('is_active', true)
             ->where('role', '!=', 'super_admin')
@@ -38,10 +43,18 @@ class DeactivateExpiredAccounts extends Command
         foreach ($expiredUsers as $user) {
             $user->deactivateAccount();
             $deactivatedCount++;
-            $this->line("Deactivated account: {$user->email} (Expired: {$user->subscription_end_date})");
+            
+            if (!$quiet) {
+                $this->line("Deactivated account: {$user->email} (Expired: {$user->subscription_end_date})");
+            }
         }
 
-        $this->info("Deactivated {$deactivatedCount} expired accounts.");
+        if (!$quiet) {
+            $this->info("Deactivated {$deactivatedCount} expired accounts.");
+        }
+
+        // Log the result for cron monitoring
+        Log::info("Daily user deactivation completed: {$deactivatedCount} accounts deactivated");
 
         return Command::SUCCESS;
     }

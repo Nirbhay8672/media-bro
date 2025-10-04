@@ -48,7 +48,7 @@ class UserController extends Controller
             'role' => 'required|in:super_admin,admin,user',
         ]);
 
-        User::create([
+        $user = User::create([
             'name' => $request->name,
             'username' => $request->username,
             'email' => $request->email,
@@ -57,7 +57,13 @@ class UserController extends Controller
             'subscription_start_date' => $request->subscription_start_date,
             'subscription_end_date' => $request->subscription_end_date,
             'role' => $request->role,
+            'is_active' => true, // Default to active, will be updated based on subscription
         ]);
+
+        // Update account status based on subscription dates
+        if (!$user->isSuperAdmin()) {
+            $user->setSubscriptionDates($request->subscription_start_date, $request->subscription_end_date);
+        }
 
         return redirect()->route('users.index')->with('success', 'User created successfully!');
     }
@@ -90,6 +96,11 @@ class UserController extends Controller
         }
 
         $user->update($updateData);
+
+        // Update account status based on new subscription dates
+        if (!$user->isSuperAdmin()) {
+            $user->setSubscriptionDates($request->subscription_start_date, $request->subscription_end_date);
+        }
 
         return redirect()->route('users.index')->with('success', 'User updated successfully!');
     }
