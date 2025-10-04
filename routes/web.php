@@ -33,6 +33,11 @@ Route::get('/', function () {
 Route::get('template/{token}', [TemplateController::class, 'share'])->name('template.share');
 Route::post('template/{token}/track-download', [TemplateController::class, 'trackDownload'])->name('template.track-download');
 
+// CSRF token refresh endpoint
+Route::get('csrf-token', function () {
+    return response()->json(['csrf_token' => csrf_token()]);
+})->name('csrf-token');
+
 // ============================================================================
 // AUTHENTICATED ROUTES
 // ============================================================================
