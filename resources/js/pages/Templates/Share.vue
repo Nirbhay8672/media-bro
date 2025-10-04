@@ -12,6 +12,7 @@ interface Template {
     width: number;
     height: number;
     background_image?: string;
+    background_image_url?: string;
     canvas_data: any[];
     share_token: string;
     is_active: boolean;
@@ -204,7 +205,7 @@ const canvasStyle = computed(() => {
         height: props.template.height + 'px',
         transform: `scale(${scale})`,
         transformOrigin: 'top center',
-        backgroundImage: props.template.background_image ? `url(/storage/${props.template.background_image})` : 'none',
+        backgroundImage: props.template.background_image_url ? `url(${props.template.background_image_url})` : (props.template.background_image ? `url(/storage/${props.template.background_image})` : 'none'),
         backgroundSize: 'cover',
         backgroundPosition: 'center',
         backgroundRepeat: 'no-repeat'
@@ -273,22 +274,27 @@ const generateImage = async () => {
             throw new Error('Preview container not found');
         }
 
-        // Use dom-to-image for better CSS support
+        // Use dom-to-image for maximum quality
         const dataUrl = await domtoimage.toPng(previewElement, {
             quality: 1.0,
             bgcolor: '#ffffff',
-            width: previewElement.offsetWidth,
-            height: previewElement.offsetHeight,
+            width: previewElement.offsetWidth * 2, // 2x resolution for crisp quality
+            height: previewElement.offsetHeight * 2, // 2x resolution for crisp quality
             style: {
-                transform: 'scale(1)',
-                transformOrigin: 'top left'
-            }
+                transform: 'scale(2)', // Scale up for high resolution
+                transformOrigin: 'top left',
+                imageRendering: 'crisp-edges', // Better text rendering
+                textRendering: 'optimizeLegibility' // Better text quality
+            },
+            pixelRatio: 2, // High DPI support
+            cacheBust: true // Ensure fresh rendering
         });
 
-        // Create download link
+        // Create download link with timestamp
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
         const link = document.createElement('a');
         link.href = dataUrl;
-        link.download = `${props.template.name}.png`;
+        link.download = `${props.template.name}_${timestamp}.png`;
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
@@ -304,7 +310,7 @@ const generateImage = async () => {
                     'Accept': 'application/json'
                 },
                 body: JSON.stringify({
-                    file_name: `${props.template.name}.png`,
+                    file_name: `${props.template.name}_${timestamp}.png`,
                     file_size: dataUrl.length // Approximate file size
                 })
             });

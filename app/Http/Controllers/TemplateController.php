@@ -30,6 +30,13 @@ class TemplateController extends Controller
             ->orderBy('created_at', 'desc')
             ->get();
 
+        // Add full URL for background images
+        $templates->each(function ($template) {
+            if ($template->background_image) {
+                $template->background_image_url = asset('storage/' . $template->background_image);
+            }
+        });
+
         return Inertia::render('Templates/Index', [
             'templates' => $templates
         ]);
@@ -172,6 +179,11 @@ class TemplateController extends Controller
         // Track the visit
         $this->visitorTrackingService->trackVisit($template, $request);
 
+        // Add full URL for background image
+        if ($template->background_image) {
+            $template->background_image_url = asset('storage/' . $template->background_image);
+        }
+
         return Inertia::render('Templates/Share', [
             'template' => $template
         ]);
@@ -193,8 +205,9 @@ class TemplateController extends Controller
             Log::info('Canvas data received:', $canvasData);
             Log::info('Template dimensions:', ['width' => $template->width, 'height' => $template->height]);
 
-            // Create the final image
-            $filename = 'generated_' . $template->id . '_' . time() . '.png';
+            // Create the final image with readable timestamp
+            $timestamp = now()->format('Y-m-d_H-i-s');
+            $filename = $template->name . '_' . $timestamp . '.png';
             $filepath = storage_path('app/public/generated/' . $filename);
 
             // Ensure directory exists
@@ -202,11 +215,15 @@ class TemplateController extends Controller
                 mkdir(dirname($filepath), 0755, true);
             }
 
-            // Create main canvas
-            $image = imagecreate($template->width, $template->height);
+            // Create main canvas with true color for better quality
+            $image = imagecreatetruecolor($template->width, $template->height);
             $white = imagecolorallocate($image, 255, 255, 255);
             $black = imagecolorallocate($image, 0, 0, 0);
 
+            // Enable alpha blending and save alpha for better quality
+            imagealphablending($image, false);
+            imagesavealpha($image, true);
+            
             // Fill with white background
             imagefill($image, 0, 0, $white);
 
@@ -216,8 +233,11 @@ class TemplateController extends Controller
                 if (file_exists($backgroundPath)) {
                     $background = imagecreatefromstring(file_get_contents($backgroundPath));
                     if ($background) {
-                        // Resize background to fit template dimensions
+                        // Resize background to fit template dimensions with high quality
                         $resizedBackground = imagecreatetruecolor($template->width, $template->height);
+                        // Enable alpha blending for better quality
+                        imagealphablending($resizedBackground, false);
+                        imagesavealpha($resizedBackground, true);
                         imagecopyresampled($resizedBackground, $background, 0, 0, 0, 0,
                             $template->width, $template->height, imagesx($background), imagesy($background));
                         imagecopy($image, $resizedBackground, 0, 0, 0, 0, $template->width, $template->height);
@@ -236,8 +256,8 @@ class TemplateController extends Controller
                 }
             }
 
-            // Save the image
-            imagepng($image, $filepath);
+            // Save the image with maximum quality
+            imagepng($image, $filepath, 0); // 0 = no compression (maximum quality)
             imagedestroy($image);
 
             // Return download URL
@@ -340,8 +360,11 @@ class TemplateController extends Controller
             $uploadedImage = imagecreatefromstring(file_get_contents($imageFile->getPathname()));
             if (!$uploadedImage) return;
 
-            // Resize uploaded image to fit element dimensions
+            // Resize uploaded image to fit element dimensions with high quality
             $resizedImage = imagecreatetruecolor($width, $height);
+            // Enable alpha blending for better quality
+            imagealphablending($resizedImage, false);
+            imagesavealpha($resizedImage, true);
             imagecopyresampled($resizedImage, $uploadedImage, 0, 0, 0, 0,
                 $width, $height, imagesx($uploadedImage), imagesy($uploadedImage));
 

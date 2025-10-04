@@ -61,6 +61,7 @@ interface Template {
     width: number;
     height: number;
     background_image?: string;
+    background_image_url?: string;
     canvas_data: CanvasElement[] | string;
     share_token: string;
     is_active: boolean;
@@ -237,7 +238,7 @@ const showCopyError = () => {
                         <div class="h-48 w-full bg-gray-100 dark:bg-gray-700 rounded-t-lg overflow-hidden">
                             <img
                                 v-if="template.background_image"
-                                :src="`/storage/${template.background_image}`"
+                                :src="template.background_image_url || `/storage/${template.background_image}`"
                                 :alt="template.name"
                                 class="w-full h-full object-cover"
                             />
