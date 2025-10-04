@@ -16,7 +16,7 @@ class UserController extends Controller
         $users = User::withCount('templates')
             ->orderBy('created_at', 'desc')
             ->where('role', 'admin')
-            ->paginate(10);
+            ->paginate(500);
         
         return Inertia::render('Users/Index', [
             'users' => $users

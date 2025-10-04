@@ -18,7 +18,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { type BreadcrumbItem, type User } from '@/types';
-import { MoreHorizontal, Plus, Edit, Trash2, Eye, Loader2 } from 'lucide-vue-next';
+import { MoreHorizontal, Plus, Edit, Trash2, Eye, Loader2, Search, X } from 'lucide-vue-next';
 import { ref, computed } from 'vue';
 import UserFormModal from '@/components/modals/user/UserFormModal.vue';
 import ViewUserModal from '@/components/modals/user/ViewUserModal.vue';
@@ -45,6 +45,7 @@ const togglingUsers = ref<Set<number>>(new Set());
 // Filter states
 const templateLimitFilter = ref('');
 const statusFilter = ref('');
+const searchQuery = ref('');
 
 const breadcrumbItems: BreadcrumbItem[] = [
     {
@@ -68,11 +69,27 @@ const getRoleBadgeVariant = (role: string) => {
 
 // Computed properties for filtering
 const hasActiveFilters = computed(() => {
-    return templateLimitFilter.value !== '' || statusFilter.value !== '';
+    return templateLimitFilter.value !== '' || statusFilter.value !== '' || searchQuery.value !== '';
 });
 
 const filteredUsers = computed(() => {
     let filtered = props.users.data;
+
+    // Search functionality
+    if (searchQuery.value.trim()) {
+        const query = searchQuery.value.toLowerCase().trim();
+        filtered = filtered.filter(user => {
+            const name = user.name?.toLowerCase() || '';
+            const username = user.username?.toLowerCase() || '';
+            const email = user.email?.toLowerCase() || '';
+            const mobile = user.mobile?.toLowerCase() || '';
+            
+            return name.includes(query) || 
+                   username.includes(query) || 
+                   email.includes(query) || 
+                   mobile.includes(query);
+        });
+    }
 
     // Filter by template limit
     if (templateLimitFilter.value === 'unlimited') {
@@ -223,6 +240,7 @@ const applyFilters = () => {
 const clearFilters = () => {
     templateLimitFilter.value = '';
     statusFilter.value = '';
+    searchQuery.value = '';
 };
 </script>
 
@@ -244,8 +262,30 @@ const clearFilters = () => {
                 </Button>
             </div>
 
-            <!-- Filters -->
-            <div class="flex items-center gap-4 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+            <!-- Search and Filters -->
+            <div class="space-y-4">
+                <!-- Search Bar -->
+                <div class="relative">
+                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <Search class="h-4 w-4 text-gray-400" />
+                    </div>
+                    <input
+                        v-model="searchQuery"
+                        type="text"
+                        placeholder="Search by name, username, email, or mobile..."
+                        class="w-full pl-10 pr-10 py-3 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                    />
+                    <button
+                        v-if="searchQuery"
+                        @click="searchQuery = ''"
+                        class="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                    >
+                        <X class="h-4 w-4" />
+                    </button>
+                </div>
+
+                <!-- Filters -->
+                <div class="flex items-center gap-4 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
                 <div class="flex items-center gap-2">
                     <label for="template-limit-filter" class="text-sm font-medium text-gray-700 dark:text-gray-300">
                         Template Limit:
@@ -290,6 +330,7 @@ const clearFilters = () => {
                 >
                     Clear Filters
                 </Button>
+                </div>
             </div>
 
             <div class="rounded-md border">
@@ -313,7 +354,14 @@ const clearFilters = () => {
                                     <div class="text-lg font-medium">No users found</div>
                                     <div class="text-sm">
                                         <span v-if="hasActiveFilters">
-                                            Try adjusting your filters or 
+                                            <span v-if="searchQuery">
+                                                No users match "{{ searchQuery }}" 
+                                            </span>
+                                            <span v-else>
+                                                No users match your current filters
+                                            </span>
+                                            <br>
+                                            Try adjusting your search or 
                                             <button @click="clearFilters" class="text-blue-600 hover:text-blue-800 underline">
                                                 clear all filters
                                             </button>
@@ -440,7 +488,10 @@ const clearFilters = () => {
                 <div class="text-sm text-muted-foreground">
                     <span v-if="hasActiveFilters">
                         Showing {{ filteredUsers.length }} of {{ users.total }} users
-                        <span class="ml-2 text-blue-600">(filtered)</span>
+                        <span class="ml-2 text-blue-600">
+                            <span v-if="searchQuery">(search: "{{ searchQuery }}")</span>
+                            <span v-else>(filtered)</span>
+                        </span>
                     </span>
                     <span v-else>
                         Showing {{ (users.current_page - 1) * users.per_page + 1 }} to 

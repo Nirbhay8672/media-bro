@@ -23,6 +23,8 @@ class UserSeeder extends Seeder
             'subscription_start_date' => now()->subYear(),
             'subscription_end_date' => now()->addYear(),
             'role' => 'super_admin',
+            'is_active' => true,
+            'template_limit' => -1,
             'email_verified_at' => now(),
         ]);
 
@@ -36,6 +38,8 @@ class UserSeeder extends Seeder
             'subscription_start_date' => now()->subMonth(),
             'subscription_end_date' => now()->addMonths(11),
             'role' => 'admin',
+            'is_active' => true,
+            'template_limit' => -1,
             'email_verified_at' => now(),
         ]);
     }
