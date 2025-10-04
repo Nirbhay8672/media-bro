@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import AppLogoIcon from '@/components/AppLogoIcon.vue';
 import { home } from '@/routes';
-import { Link, usePage } from '@inertiajs/vue3';
+import { Link } from '@inertiajs/vue3';
+import { useAssets } from '@/composables/useAssets';
 
-const page = usePage();
+const { getLogoUrl } = useAssets();
 
 defineProps<{
     title?: string;
@@ -26,7 +27,7 @@ defineProps<{
                             class="mb-1 flex h-20 w-20 items-center justify-center rounded-xl bg-white shadow-xl p-3 border border-gray-100"
                         >
                             <img
-                                :src="page.props.logo_url || '/images/logo.png'"
+                                :src="getLogoUrl()"
                                 alt="Media Bro Logo"
                                 class="h-14 w-14 object-contain"
                             />

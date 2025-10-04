@@ -38,6 +38,20 @@ Route::get('csrf-token', function () {
     return response()->json(['csrf_token' => csrf_token()]);
 })->name('csrf-token');
 
+// Asset test endpoint for debugging
+Route::get('test-assets', function () {
+    return response()->json([
+        'app_url' => config('app.url'),
+        'asset_logo' => asset('images/logo.png'),
+        'asset_storage' => asset('storage/test.txt'),
+        'filesystem_public_url' => config('filesystems.disks.public.url'),
+        'logo_exists' => file_exists(public_path('images/logo.png')),
+        'storage_linked' => is_link(public_path('storage')),
+        'environment' => app()->environment(),
+        'asset_helper' => \App\Helpers\AssetHelper::testAssets(),
+    ]);
+})->name('test-assets');
+
 // ============================================================================
 // AUTHENTICATED ROUTES
 // ============================================================================

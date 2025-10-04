@@ -3,9 +3,9 @@ import Breadcrumbs from '@/components/Breadcrumbs.vue';
 import NavbarUser from '@/components/NavbarUser.vue';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import type { BreadcrumbItemType } from '@/types';
-import { usePage } from '@inertiajs/vue3';
+import { useAssets } from '@/composables/useAssets';
 
-const page = usePage();
+const { getLogoUrl } = useAssets();
 
 withDefaults(
     defineProps<{
@@ -26,7 +26,7 @@ withDefaults(
             <div class="flex items-center space-x-3">
                 <div class="w-10 h-10 bg-white rounded-lg flex items-center justify-center shadow-lg">
                     <img 
-                        :src="page.props.logo_url || '/images/logo.png'"
+                        :src="getLogoUrl()"
                         alt="Media Bro Logo" 
                         class="w-8 h-8 object-contain"
                     />

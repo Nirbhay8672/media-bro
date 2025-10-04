@@ -1,14 +1,14 @@
 <script setup lang="ts">
-import { usePage } from '@inertiajs/vue3';
+import { useAssets } from '@/composables/useAssets';
 
-const page = usePage();
+const { getLogoUrl } = useAssets();
 </script>
 
 <template>
     <div class="flex items-center gap-4">
         <div class="flex aspect-square size-12 items-center justify-center overflow-hidden bg-white rounded-lg p-1">
             <img 
-                :src="page.props.logo_url || '/images/logo.png'" 
+                :src="getLogoUrl()" 
                 alt="Media Bro Logo" 
                 class="w-full h-full object-contain"
             />
