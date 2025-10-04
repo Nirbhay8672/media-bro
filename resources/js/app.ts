@@ -7,9 +7,12 @@ import { createApp, h } from 'vue';
 import { initializeTheme } from './composables/useAppearance';
 import axios from 'axios';
 
+// Get CSRF token from meta tag
+const token = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+
 // Configure axios globally
 axios.defaults.headers.common['X-Requested-With'] = 'XMLHttpRequest';
-axios.defaults.headers.common['X-CSRF-TOKEN'] = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+axios.defaults.headers.common['X-CSRF-TOKEN'] = token || '';
 
 // Add response interceptor to handle CSRF token refresh
 axios.interceptors.response.use(
@@ -39,6 +42,16 @@ createInertiaApp({
     },
     progress: {
         color: '#4B5563',
+    },
+    // Add CSRF token to all Inertia requests
+    before: (page, visit) => {
+        // Add CSRF token to headers for all requests
+        if (token) {
+            visit.headers = {
+                ...visit.headers,
+                'X-CSRF-TOKEN': token,
+            };
+        }
     },
 });
 
