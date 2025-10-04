@@ -157,6 +157,27 @@
               </p>
             </div>
 
+            <div class="space-y-2">
+              <label for="template_limit" class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                Template Limit *
+              </label>
+              <select
+                id="template_limit"
+                v-model="form.template_limit"
+                required
+                class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                :class="{ 'border-red-500': form.errors.template_limit }"
+              >
+                <option value="-1">Unlimited</option>
+                <option value="5">5 Templates (Demo/Trial)</option>
+                <option value="10">10 Templates (Basic)</option>
+                <option value="25">25 Templates (Standard)</option>
+              </select>
+              <p v-if="form.errors.template_limit" class="text-sm text-red-500">
+                {{ form.errors.template_limit }}
+              </p>
+            </div>
+
           </div>
 
           <div class="flex justify-end gap-4 pt-6 border-t border-gray-200 dark:border-gray-600">
@@ -211,6 +232,7 @@ const form = useForm({
   subscription_start_date: '',
   subscription_end_date: '',
   role: 'admin' as 'super_admin' | 'admin' | 'user',
+  template_limit: -1,
 });
 
 const closeModal = () => {
@@ -297,10 +319,12 @@ watch(() => props.isOpen, (isOpen) => {
       form.subscription_start_date = props.user.subscription_start_date ? new Date(props.user.subscription_start_date).toISOString().split('T')[0] : '';
       form.subscription_end_date = props.user.subscription_end_date ? new Date(props.user.subscription_end_date).toISOString().split('T')[0] : '';
       form.role = 'admin'; // Always set as admin
+      form.template_limit = props.user.template_limit || -1;
     } else {
       // Create mode - reset form
       form.reset();
       form.role = 'admin'; // Always set as admin
+      form.template_limit = -1; // Default to unlimited
     }
     form.clearErrors();
   }

@@ -38,6 +38,7 @@ export interface User {
     subscription_start_date?: string;
     subscription_end_date?: string;
     is_active: boolean;
+    template_limit: number;
     created_at: string;
     updated_at: string;
     templates_count?: number;

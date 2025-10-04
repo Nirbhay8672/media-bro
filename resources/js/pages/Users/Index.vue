@@ -209,6 +209,7 @@ const toggleUserStatus = async (user: User) => {
                             <TableHead>Email</TableHead>
                             <TableHead>Username</TableHead>
                             <TableHead>Status</TableHead>
+                            <TableHead>Template Limit</TableHead>
                             <TableHead>Subscription</TableHead>
                             <TableHead>Templates</TableHead>
                             <TableHead class="w-[50px]"></TableHead>
@@ -268,6 +269,19 @@ const toggleUserStatus = async (user: User) => {
                                     >
                                         Super Admin
                                     </span>
+                                </div>
+                            </TableCell>
+                            <TableCell>
+                                <div class="text-sm">
+                                    <div v-if="user.template_limit === -1" class="font-medium text-green-600">
+                                        Unlimited
+                                    </div>
+                                    <div v-else class="font-medium">
+                                        {{ user.template_limit }} templates
+                                    </div>
+                                    <div v-if="user.template_limit !== -1" class="text-muted-foreground">
+                                        {{ user.templates_count || 0 }}/{{ user.template_limit }} used
+                                    </div>
                                 </div>
                             </TableCell>
                             <TableCell>

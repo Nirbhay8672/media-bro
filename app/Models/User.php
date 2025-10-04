@@ -29,6 +29,7 @@ class User extends Authenticatable
         'subscription_end_date',
         'role',
         'is_active',
+        'template_limit',
     ];
 
     /**
@@ -54,6 +55,7 @@ class User extends Authenticatable
             'subscription_start_date' => 'date',
             'subscription_end_date' => 'date',
             'is_active' => 'boolean',
+            'template_limit' => 'integer',
         ];
     }
 
@@ -194,6 +196,76 @@ class User extends Authenticatable
             $this->activateAccount();
         } else {
             // If subscription is expired, deactivate the account
+            $this->deactivateAccount();
+        }
+    }
+
+    /**
+     * Check if user has unlimited template creation
+     */
+    public function hasUnlimitedTemplates(): bool
+    {
+        return $this->template_limit === -1;
+    }
+
+    /**
+     * Get the template limit for this user
+     */
+    public function getTemplateLimit(): int
+    {
+        return $this->template_limit;
+    }
+
+    /**
+     * Get the number of templates created by this user
+     */
+    public function getTemplateCount(): int
+    {
+        return $this->templates()->count();
+    }
+
+    /**
+     * Check if user can create more templates
+     */
+    public function canCreateTemplate(): bool
+    {
+        if ($this->hasUnlimitedTemplates()) {
+            return true;
+        }
+
+        return $this->getTemplateCount() < $this->template_limit;
+    }
+
+    /**
+     * Get remaining template slots
+     */
+    public function getRemainingTemplateSlots(): int
+    {
+        if ($this->hasUnlimitedTemplates()) {
+            return -1; // Unlimited
+        }
+
+        return max(0, $this->template_limit - $this->getTemplateCount());
+    }
+
+    /**
+     * Check if user has reached template limit
+     */
+    public function hasReachedTemplateLimit(): bool
+    {
+        if ($this->hasUnlimitedTemplates()) {
+            return false;
+        }
+
+        return $this->getTemplateCount() >= $this->template_limit;
+    }
+
+    /**
+     * Deactivate user if they've reached template limit
+     */
+    public function checkAndDeactivateIfLimitReached(): void
+    {
+        if ($this->hasReachedTemplateLimit() && $this->is_active) {
             $this->deactivateAccount();
         }
     }

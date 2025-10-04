@@ -55,6 +55,13 @@ class TemplateController extends Controller
      */
     public function store(Request $request)
     {
+        // Check if user can create more templates
+        if (!auth()->user()->canCreateTemplate()) {
+            return back()->withErrors([
+                'template_limit' => 'You have reached your template limit. Please contact support to upgrade your plan.'
+            ]);
+        }
+
         return $this->save($request);
     }
 
@@ -144,6 +151,11 @@ class TemplateController extends Controller
         }
 
         $template->save();
+
+        // Check if user has reached template limit after creating new template
+        if (!$isUpdate) {
+            auth()->user()->checkAndDeactivateIfLimitReached();
+        }
 
         if ($isUpdate) {
             return back()->with('success', 'Template updated successfully!');
