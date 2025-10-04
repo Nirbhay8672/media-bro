@@ -18,7 +18,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { type BreadcrumbItem, type User } from '@/types';
-import { MoreHorizontal, Plus, Edit, Trash2, Eye } from 'lucide-vue-next';
+import { MoreHorizontal, Plus, Edit, Trash2, Eye, Loader2 } from 'lucide-vue-next';
 import { ref } from 'vue';
 import UserFormModal from '@/components/modals/user/UserFormModal.vue';
 import ViewUserModal from '@/components/modals/user/ViewUserModal.vue';
@@ -40,6 +40,7 @@ const props = defineProps<Props>();
 const showUserFormModal = ref(false);
 const showViewModal = ref(false);
 const selectedUser = ref<User | null>(null);
+const togglingUsers = ref<Set<number>>(new Set());
 
 const breadcrumbItems: BreadcrumbItem[] = [
     {
@@ -131,6 +132,55 @@ const closeModals = () => {
 const refreshUsers = () => {
     router.reload();
 };
+
+const toggleUserStatus = async (user: User) => {
+    // Add user to loading set
+    togglingUsers.value.add(user.id);
+    
+    try {
+        const response = await fetch(`/users/${user.id}/toggle-status`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+            },
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+            // Update the user's status in the local data
+            user.is_active = data.is_active;
+            
+            Swal.fire({
+                title: 'Success!',
+                text: data.message,
+                icon: 'success',
+                position: 'top-end',
+                showConfirmButton: false,
+                timer: 3000,
+                timerProgressBar: true,
+                toast: true
+            });
+        } else {
+            throw new Error(data.error || 'Failed to toggle user status');
+        }
+    } catch (error) {
+        Swal.fire({
+            title: 'Error!',
+            text: error instanceof Error ? error.message : 'Failed to toggle user status',
+            icon: 'error',
+            position: 'top-end',
+            showConfirmButton: false,
+            timer: 4000,
+            timerProgressBar: true,
+            toast: true
+        });
+    } finally {
+        // Remove user from loading set
+        togglingUsers.value.delete(user.id);
+    }
+};
 </script>
 
 <template>
@@ -158,6 +208,7 @@ const refreshUsers = () => {
                             <TableHead>Name</TableHead>
                             <TableHead>Email</TableHead>
                             <TableHead>Username</TableHead>
+                            <TableHead>Status</TableHead>
                             <TableHead>Subscription</TableHead>
                             <TableHead>Templates</TableHead>
                             <TableHead class="w-[50px]"></TableHead>
@@ -168,6 +219,57 @@ const refreshUsers = () => {
                             <TableCell class="font-medium">{{ user.name }}</TableCell>
                             <TableCell>{{ user.email }}</TableCell>
                             <TableCell>{{ user.username || '-' }}</TableCell>
+                            <TableCell>
+                                <div class="flex items-center gap-3">
+                                    <div class="flex items-center gap-2">
+                                        <div 
+                                            :class="[
+                                                'w-2 h-2 rounded-full',
+                                                user.is_active ? 'bg-green-500' : 'bg-gray-400'
+                                            ]"
+                                        ></div>
+                                        <span 
+                                            :class="[
+                                                'text-sm font-medium',
+                                                user.is_active ? 'text-green-700' : 'text-gray-500'
+                                            ]"
+                                        >
+                                            {{ user.is_active ? 'Active' : 'Inactive' }}
+                                        </span>
+                                    </div>
+                                    
+                                    <button
+                                        v-if="user.role !== 'super_admin'"
+                                        @click="toggleUserStatus(user)"
+                                        :disabled="togglingUsers.has(user.id)"
+                                        :title="user.is_active ? 'Click to deactivate account' : 'Click to activate account'"
+                                        :class="[
+                                            'relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2',
+                                            user.is_active ? 'bg-indigo-600' : 'bg-gray-200',
+                                            togglingUsers.has(user.id) ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:opacity-80'
+                                        ]"
+                                    >
+                                        <span
+                                            v-if="!togglingUsers.has(user.id)"
+                                            :class="[
+                                                'inline-block h-4 w-4 transform rounded-full bg-white transition-transform',
+                                                user.is_active ? 'translate-x-6' : 'translate-x-1'
+                                            ]"
+                                        />
+                                        <Loader2
+                                            v-else
+                                            class="h-3 w-3 animate-spin text-white mx-auto"
+                                        />
+                                    </button>
+                                    
+                                    <span 
+                                        v-else 
+                                        class="text-xs text-gray-400 italic"
+                                    >
+                                        Super Admin
+                                    </span>
+                                </div>
+                            </TableCell>
                             <TableCell>
                                 <div v-if="user.subscription_start_date && user.subscription_end_date" class="text-sm">
                                     <div>Start: {{ formatDate(user.subscription_start_date) }}</div>

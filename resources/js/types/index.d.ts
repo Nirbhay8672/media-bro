@@ -37,6 +37,7 @@ export interface User {
     mobile?: string;
     subscription_start_date?: string;
     subscription_end_date?: string;
+    is_active: boolean;
     created_at: string;
     updated_at: string;
     templates_count?: number;

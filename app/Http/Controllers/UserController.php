@@ -114,5 +114,53 @@ class UserController extends Controller
             'user' => $user
         ]);
     }
+
+    public function toggleStatus(User $user)
+    {
+        // Prevent toggling super admin status
+        if ($user->isSuperAdmin()) {
+            return response()->json(['error' => 'Cannot change super admin account status'], 403);
+        }
+
+        if ($user->is_active) {
+            $user->deactivateAccount();
+            $message = 'User account deactivated successfully!';
+        } else {
+            $user->activateAccount();
+            $message = 'User account activated successfully!';
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => $message,
+            'is_active' => $user->is_active
+        ]);
+    }
+
+    public function updateSubscription(User $user, Request $request)
+    {
+        $request->validate([
+            'subscription_start_date' => 'required|date',
+            'subscription_end_date' => 'required|date|after:subscription_start_date',
+        ]);
+
+        // Prevent updating super admin subscription
+        if ($user->isSuperAdmin()) {
+            return response()->json(['error' => 'Cannot update super admin subscription'], 403);
+        }
+
+        $user->setSubscriptionDates(
+            $request->subscription_start_date,
+            $request->subscription_end_date
+        );
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Subscription updated successfully!',
+            'is_active' => $user->is_active,
+            'subscription_start_date' => $user->subscription_start_date,
+            'subscription_end_date' => $user->subscription_end_date,
+        ]);
+    }
 }
 

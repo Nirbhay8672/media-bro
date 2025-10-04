@@ -32,6 +32,13 @@ class AuthenticatedSessionController extends Controller
     {
         $user = $request->validateCredentials();
 
+        // Check account status before logging in
+        if (!$user->isAccountActive()) {
+            return back()->withErrors([
+                'email' => 'Your account is inactive. Please contact support to activate your account.',
+            ]);
+        }
+
         // Check subscription status before logging in
         if (!$user->hasActiveSubscription()) {
             return back()->withErrors([

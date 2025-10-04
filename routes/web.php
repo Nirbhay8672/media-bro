@@ -60,6 +60,29 @@ Route::get('test-assets', function () {
 // Dashboard (requires auth + email verification)
 Route::get('dashboard', function () {
     $user = auth()->user();
+    
+    // Check account status and redirect with error if inactive
+    if (!$user->isAccountActive()) {
+        Auth::logout();
+        request()->session()->invalidate();
+        request()->session()->regenerateToken();
+        
+        return redirect()->route('login')->withErrors([
+            'email' => 'Your account is inactive. Please contact support to activate your account.',
+        ]);
+    }
+
+    // Check subscription status and redirect with error if expired
+    if (!$user->hasActiveSubscription()) {
+        Auth::logout();
+        request()->session()->invalidate();
+        request()->session()->regenerateToken();
+        
+        return redirect()->route('login')->withErrors([
+            'email' => 'Your account subscription has expired. Please contact support to renew your subscription.',
+        ]);
+    }
+    
     $templates = \App\Models\Template::where('user_id', $user->id)
         ->orderBy('created_at', 'desc')
         ->limit(6)
@@ -78,7 +101,7 @@ Route::get('dashboard', function () {
 
     return Inertia::render('Dashboard', $data);
     
-})->middleware(['auth', 'verified' , 'subscription'])->name('dashboard');
+})->middleware(['auth', 'verified'])->name('dashboard');
 
 // ============================================================================
 // SUBSCRIPTION-PROTECTED ROUTES
@@ -113,6 +136,10 @@ Route::middleware(['auth', 'verified', 'super_admin'])->group(function () {
     Route::get('users/{user}/edit', [UserController::class, 'edit'])->name('users.edit');
     Route::post('users/{user}', [UserController::class, 'update'])->name('users.update');
     Route::delete('users/{user}', [UserController::class, 'destroy'])->name('users.destroy');
+    
+    // User status management
+    Route::post('users/{user}/toggle-status', [UserController::class, 'toggleStatus'])->name('users.toggle-status');
+    Route::post('users/{user}/update-subscription', [UserController::class, 'updateSubscription'])->name('users.update-subscription');
 });
 
 // ============================================================================

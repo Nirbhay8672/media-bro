@@ -28,6 +28,7 @@ class User extends Authenticatable
         'subscription_start_date',
         'subscription_end_date',
         'role',
+        'is_active',
     ];
 
     /**
@@ -52,6 +53,7 @@ class User extends Authenticatable
             'password' => 'hashed',
             'subscription_start_date' => 'date',
             'subscription_end_date' => 'date',
+            'is_active' => 'boolean',
         ];
     }
 
@@ -80,12 +82,25 @@ class User extends Authenticatable
     }
 
     /**
+     * Check if user account is active
+     */
+    public function isAccountActive(): bool
+    {
+        return $this->is_active;
+    }
+
+    /**
      * Check if user has active subscription
      */
     public function hasActiveSubscription(): bool
     {
         if ($this->isSuperAdmin()) {
             return true; // Super admin always has access
+        }
+
+        // Check if account is active first
+        if (!$this->isAccountActive()) {
+            return false;
         }
 
         if (!$this->subscription_start_date || !$this->subscription_end_date) {
@@ -119,5 +134,54 @@ class User extends Authenticatable
     public function templates(): HasMany
     {
         return $this->hasMany(Template::class);
+    }
+
+    /**
+     * Activate user account
+     */
+    public function activateAccount(): void
+    {
+        $this->update(['is_active' => true]);
+    }
+
+    /**
+     * Deactivate user account
+     */
+    public function deactivateAccount(): void
+    {
+        $this->update(['is_active' => false]);
+    }
+
+    /**
+     * Check and update account status based on subscription
+     */
+    public function updateAccountStatusBasedOnSubscription(): void
+    {
+        if ($this->isSuperAdmin()) {
+            return; // Super admin accounts are always active
+        }
+
+        $isExpired = $this->isSubscriptionExpired();
+        
+        if ($isExpired && $this->is_active) {
+            $this->deactivateAccount();
+        } elseif (!$isExpired && !$this->is_active) {
+            // Only auto-activate if subscription is valid
+            $this->activateAccount();
+        }
+    }
+
+    /**
+     * Manually set subscription dates and update account status
+     */
+    public function setSubscriptionDates($startDate, $endDate): void
+    {
+        $this->update([
+            'subscription_start_date' => $startDate,
+            'subscription_end_date' => $endDate,
+        ]);
+
+        // Update account status based on new subscription dates
+        $this->updateAccountStatusBasedOnSubscription();
     }
 }
