@@ -18,7 +18,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { type BreadcrumbItem, type User } from '@/types';
-import { MoreHorizontal, Plus, Edit, Trash2, Eye, Loader2, Search, X } from 'lucide-vue-next';
+import { MoreHorizontal, Plus, Edit, Trash2, Eye, Loader2, Search, X, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-vue-next';
 import { ref, computed } from 'vue';
 import UserFormModal from '@/components/modals/user/UserFormModal.vue';
 import ViewUserModal from '@/components/modals/user/ViewUserModal.vue';
@@ -47,6 +47,10 @@ const templateLimitFilter = ref('');
 const statusFilter = ref('');
 const searchQuery = ref('');
 
+// Sort states
+const sortBy = ref('');
+const sortDirection = ref('asc'); // 'asc' or 'desc'
+
 const breadcrumbItems: BreadcrumbItem[] = [
     {
         title: 'User Management',
@@ -67,9 +71,9 @@ const getRoleBadgeVariant = (role: string) => {
     }
 };
 
-// Computed properties for filtering
+// Computed properties for filtering and sorting
 const hasActiveFilters = computed(() => {
-    return templateLimitFilter.value !== '' || statusFilter.value !== '' || searchQuery.value !== '';
+    return templateLimitFilter.value !== '' || statusFilter.value !== '' || searchQuery.value !== '' || sortBy.value !== '';
 });
 
 const filteredUsers = computed(() => {
@@ -106,6 +110,52 @@ const filteredUsers = computed(() => {
         filtered = filtered.filter(user => user.is_active);
     } else if (statusFilter.value === 'inactive') {
         filtered = filtered.filter(user => !user.is_active);
+    }
+
+    // Sorting
+    if (sortBy.value) {
+        filtered.sort((a, b) => {
+            let aValue, bValue;
+
+            switch (sortBy.value) {
+                case 'name':
+                    aValue = a.name?.toLowerCase() || '';
+                    bValue = b.name?.toLowerCase() || '';
+                    break;
+                case 'email':
+                    aValue = a.email?.toLowerCase() || '';
+                    bValue = b.email?.toLowerCase() || '';
+                    break;
+                case 'username':
+                    aValue = a.username?.toLowerCase() || '';
+                    bValue = b.username?.toLowerCase() || '';
+                    break;
+                case 'status':
+                    aValue = a.is_active ? 1 : 0;
+                    bValue = b.is_active ? 1 : 0;
+                    break;
+                case 'template_limit':
+                    aValue = a.template_limit;
+                    bValue = b.template_limit;
+                    break;
+                case 'expiry_date':
+                    aValue = a.subscription_end_date ? new Date(a.subscription_end_date).getTime() : 0;
+                    bValue = b.subscription_end_date ? new Date(b.subscription_end_date).getTime() : 0;
+                    break;
+                case 'templates_count':
+                    aValue = a.templates_count || 0;
+                    bValue = b.templates_count || 0;
+                    break;
+                default:
+                    return 0;
+            }
+
+            if (sortDirection.value === 'asc') {
+                return aValue > bValue ? 1 : -1;
+            } else {
+                return aValue < bValue ? 1 : -1;
+            }
+        });
     }
 
     return filtered;
@@ -241,6 +291,27 @@ const clearFilters = () => {
     templateLimitFilter.value = '';
     statusFilter.value = '';
     searchQuery.value = '';
+    sortBy.value = '';
+    sortDirection.value = 'asc';
+};
+
+// Sort methods
+const handleSort = (field: string) => {
+    if (sortBy.value === field) {
+        // Toggle direction if same field
+        sortDirection.value = sortDirection.value === 'asc' ? 'desc' : 'asc';
+    } else {
+        // Set new field with default ascending direction
+        sortBy.value = field;
+        sortDirection.value = 'asc';
+    }
+};
+
+const getSortIcon = (field: string) => {
+    if (sortBy.value !== field) {
+        return ArrowUpDown;
+    }
+    return sortDirection.value === 'asc' ? ArrowUp : ArrowDown;
 };
 </script>
 
@@ -321,6 +392,7 @@ const clearFilters = () => {
                     </select>
                 </div>
 
+
                 <Button
                     v-if="hasActiveFilters"
                     @click="clearFilters"
@@ -337,13 +409,69 @@ const clearFilters = () => {
                 <Table>
                     <TableHeader>
                         <TableRow>
-                            <TableHead>Name</TableHead>
-                            <TableHead>Email</TableHead>
-                            <TableHead>Username</TableHead>
-                            <TableHead>Status</TableHead>
-                            <TableHead>Template Limit</TableHead>
-                            <TableHead>Subscription</TableHead>
-                            <TableHead>Templates</TableHead>
+                            <TableHead>
+                                <button
+                                    @click="handleSort('name')"
+                                    class="flex items-center gap-1 hover:text-blue-600 dark:hover:text-blue-400"
+                                >
+                                    Name
+                                    <component :is="getSortIcon('name')" class="h-3 w-3" />
+                                </button>
+                            </TableHead>
+                            <TableHead>
+                                <button
+                                    @click="handleSort('email')"
+                                    class="flex items-center gap-1 hover:text-blue-600 dark:hover:text-blue-400"
+                                >
+                                    Email
+                                    <component :is="getSortIcon('email')" class="h-3 w-3" />
+                                </button>
+                            </TableHead>
+                            <TableHead>
+                                <button
+                                    @click="handleSort('username')"
+                                    class="flex items-center gap-1 hover:text-blue-600 dark:hover:text-blue-400"
+                                >
+                                    Username
+                                    <component :is="getSortIcon('username')" class="h-3 w-3" />
+                                </button>
+                            </TableHead>
+                            <TableHead>
+                                <button
+                                    @click="handleSort('status')"
+                                    class="flex items-center gap-1 hover:text-blue-600 dark:hover:text-blue-400"
+                                >
+                                    Status
+                                    <component :is="getSortIcon('status')" class="h-3 w-3" />
+                                </button>
+                            </TableHead>
+                            <TableHead>
+                                <button
+                                    @click="handleSort('template_limit')"
+                                    class="flex items-center gap-1 hover:text-blue-600 dark:hover:text-blue-400"
+                                >
+                                    Template Limit
+                                    <component :is="getSortIcon('template_limit')" class="h-3 w-3" />
+                                </button>
+                            </TableHead>
+                            <TableHead>
+                                <button
+                                    @click="handleSort('expiry_date')"
+                                    class="flex items-center gap-1 hover:text-blue-600 dark:hover:text-blue-400"
+                                >
+                                    Subscription
+                                    <component :is="getSortIcon('expiry_date')" class="h-3 w-3" />
+                                </button>
+                            </TableHead>
+                            <TableHead>
+                                <button
+                                    @click="handleSort('templates_count')"
+                                    class="flex items-center gap-1 hover:text-blue-600 dark:hover:text-blue-400"
+                                >
+                                    Templates
+                                    <component :is="getSortIcon('templates_count')" class="h-3 w-3" />
+                                </button>
+                            </TableHead>
                             <TableHead class="w-[50px]"></TableHead>
                         </TableRow>
                     </TableHeader>
