@@ -55,8 +55,6 @@ class TemplateController extends Controller
      */
     public function show(Template $template)
     {
-        $this->authorize('view', $template);
-
         return Inertia::render('Templates/Show', [
             'template' => $template
         ]);
@@ -67,8 +65,6 @@ class TemplateController extends Controller
      */
     public function edit(Template $template)
     {
-        $this->authorize('update', $template);
-
         return Inertia::render('Templates/Create', [
             'template' => $template
         ]);
@@ -79,7 +75,6 @@ class TemplateController extends Controller
      */
     public function update(Request $request, Template $template)
     {
-        $this->authorize('update', $template);
         return $this->save($request, $template);
     }
 
@@ -143,10 +138,6 @@ class TemplateController extends Controller
         $template->save();
 
         if ($isUpdate) {
-            Log::info('Template updated successfully:', [
-                'template_id' => $template->id,
-                'template_name' => $template->name
-            ]);
             return back()->with('success', 'Template updated successfully!');
         } else {
             return back()->with('success', 'Template created successfully!');
@@ -158,8 +149,6 @@ class TemplateController extends Controller
      */
     public function destroy(Template $template)
     {
-        $this->authorize('delete', $template);
-
         // Delete background image if exists
         if ($template->background_image) {
             Storage::disk('public')->delete($template->background_image);
