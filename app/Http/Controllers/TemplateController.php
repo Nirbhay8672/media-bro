@@ -26,6 +26,7 @@ class TemplateController extends Controller
     public function index()
     {
         $templates = Template::where('user_id', auth()->id())
+            ->withCount(['visits', 'downloads'])
             ->orderBy('created_at', 'desc')
             ->get();
 
