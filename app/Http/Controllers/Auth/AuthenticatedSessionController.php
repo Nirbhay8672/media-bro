@@ -32,6 +32,13 @@ class AuthenticatedSessionController extends Controller
     {
         $user = $request->validateCredentials();
 
+        // Check subscription status before logging in
+        if (!$user->hasActiveSubscription()) {
+            return back()->withErrors([
+                'email' => 'Your account subscription has expired. Please contact support to renew your subscription.',
+            ]);
+        }
+
         if (Features::enabled(Features::twoFactorAuthentication()) && $user->hasEnabledTwoFactorAuthentication()) {
             $request->session()->put([
                 'login.id' => $user->getKey(),

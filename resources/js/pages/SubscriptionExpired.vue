@@ -24,7 +24,7 @@
                             <strong>End Date:</strong> {{ formatDate(user.subscription_end_date) }}
                         </p>
                         <p v-if="user?.subscription_end_date">
-                            <strong>Status:</strong> 
+                            <strong>Status : </strong> 
                             <span class="text-red-500 font-semibold">Expired</span>
                         </p>
                     </div>

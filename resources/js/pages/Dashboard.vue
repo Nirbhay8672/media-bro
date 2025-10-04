@@ -164,16 +164,6 @@ const isLoading = computed(() => page.props.processing as boolean);
                 </div>
             </div>
 
-            <!-- Empty State -->
-            <div v-else class="flex flex-1 items-center justify-center">
-                <div class="text-center">
-                    <div class="mx-auto h-12 w-12 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center mb-4">
-                        <Image class="h-6 w-6 text-gray-400" />
-                    </div>
-                    <h3 class="text-lg font-medium text-gray-900 dark:text-white">No templates yet</h3>
-                    <p class="text-gray-600 dark:text-gray-400 mb-4">Get started by creating your first template.</p>
-                </div>
-            </div>
         </div>
     </AppLayout>
 </template>

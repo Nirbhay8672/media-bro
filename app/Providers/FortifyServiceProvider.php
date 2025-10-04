@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 use Inertia\Inertia;
 use Laravel\Fortify\Fortify;
+use App\Actions\Fortify\HandleTwoFactorChallenge;
 
 class FortifyServiceProvider extends ServiceProvider
 {

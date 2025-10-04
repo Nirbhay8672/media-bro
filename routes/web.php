@@ -2,6 +2,7 @@
 
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Auth;
 use Inertia\Inertia;
 use App\Http\Controllers\TemplateController;
 use App\Http\Controllers\UserController;
@@ -76,7 +77,8 @@ Route::get('dashboard', function () {
     }
 
     return Inertia::render('Dashboard', $data);
-})->middleware(['auth', 'verified'])->name('dashboard');
+    
+})->middleware(['auth', 'verified' , 'subscription'])->name('dashboard');
 
 // ============================================================================
 // SUBSCRIPTION-PROTECTED ROUTES
