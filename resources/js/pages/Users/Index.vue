@@ -19,7 +19,7 @@ import {
 import AppLayout from '@/layouts/AppLayout.vue';
 import { type BreadcrumbItem, type User } from '@/types';
 import { MoreHorizontal, Plus, Edit, Trash2, Eye, Loader2 } from 'lucide-vue-next';
-import { ref } from 'vue';
+import { ref, computed } from 'vue';
 import UserFormModal from '@/components/modals/user/UserFormModal.vue';
 import ViewUserModal from '@/components/modals/user/ViewUserModal.vue';
 import usersRoutes from '@/routes/users';
@@ -42,6 +42,10 @@ const showViewModal = ref(false);
 const selectedUser = ref<User | null>(null);
 const togglingUsers = ref<Set<number>>(new Set());
 
+// Filter states
+const templateLimitFilter = ref('');
+const statusFilter = ref('');
+
 const breadcrumbItems: BreadcrumbItem[] = [
     {
         title: 'User Management',
@@ -61,6 +65,34 @@ const getRoleBadgeVariant = (role: string) => {
             return 'outline';
     }
 };
+
+// Computed properties for filtering
+const hasActiveFilters = computed(() => {
+    return templateLimitFilter.value !== '' || statusFilter.value !== '';
+});
+
+const filteredUsers = computed(() => {
+    let filtered = props.users.data;
+
+    // Filter by template limit
+    if (templateLimitFilter.value === 'unlimited') {
+        filtered = filtered.filter(user => user.template_limit === -1);
+    } else if (templateLimitFilter.value === 'limited') {
+        filtered = filtered.filter(user => user.template_limit !== -1);
+    } else if (templateLimitFilter.value && ['5', '10', '25'].includes(templateLimitFilter.value)) {
+        const limit = parseInt(templateLimitFilter.value);
+        filtered = filtered.filter(user => user.template_limit === limit);
+    }
+
+    // Filter by status
+    if (statusFilter.value === 'active') {
+        filtered = filtered.filter(user => user.is_active);
+    } else if (statusFilter.value === 'inactive') {
+        filtered = filtered.filter(user => !user.is_active);
+    }
+
+    return filtered;
+});
 
 const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString();
@@ -181,6 +213,17 @@ const toggleUserStatus = async (user: User) => {
         togglingUsers.value.delete(user.id);
     }
 };
+
+// Filter methods
+const applyFilters = () => {
+    // The filtering is handled by the computed property
+    // This method can be used for additional logic if needed
+};
+
+const clearFilters = () => {
+    templateLimitFilter.value = '';
+    statusFilter.value = '';
+};
 </script>
 
 <template>
@@ -201,6 +244,54 @@ const toggleUserStatus = async (user: User) => {
                 </Button>
             </div>
 
+            <!-- Filters -->
+            <div class="flex items-center gap-4 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                <div class="flex items-center gap-2">
+                    <label for="template-limit-filter" class="text-sm font-medium text-gray-700 dark:text-gray-300">
+                        Template Limit:
+                    </label>
+                    <select
+                        id="template-limit-filter"
+                        v-model="templateLimitFilter"
+                        @change="applyFilters"
+                        class="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-sm"
+                    >
+                        <option value="">All Users</option>
+                        <option value="unlimited">Unlimited Templates</option>
+                        <option value="limited">Limited Templates</option>
+                        <option value="5">5 Templates</option>
+                        <option value="10">10 Templates</option>
+                        <option value="25">25 Templates</option>
+                    </select>
+                </div>
+                
+                <div class="flex items-center gap-2">
+                    <label for="status-filter" class="text-sm font-medium text-gray-700 dark:text-gray-300">
+                        Status:
+                    </label>
+                    <select
+                        id="status-filter"
+                        v-model="statusFilter"
+                        @change="applyFilters"
+                        class="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-sm"
+                    >
+                        <option value="">All Status</option>
+                        <option value="active">Active</option>
+                        <option value="inactive">Inactive</option>
+                    </select>
+                </div>
+
+                <Button
+                    v-if="hasActiveFilters"
+                    @click="clearFilters"
+                    variant="outline"
+                    size="sm"
+                    class="ml-auto"
+                >
+                    Clear Filters
+                </Button>
+            </div>
+
             <div class="rounded-md border">
                 <Table>
                     <TableHeader>
@@ -216,7 +307,23 @@ const toggleUserStatus = async (user: User) => {
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        <TableRow v-for="user in users.data" :key="user.id">
+                        <TableRow v-if="filteredUsers.length === 0">
+                            <TableCell colspan="8" class="text-center py-8 text-muted-foreground">
+                                <div class="flex flex-col items-center gap-2">
+                                    <div class="text-lg font-medium">No users found</div>
+                                    <div class="text-sm">
+                                        <span v-if="hasActiveFilters">
+                                            Try adjusting your filters or 
+                                            <button @click="clearFilters" class="text-blue-600 hover:text-blue-800 underline">
+                                                clear all filters
+                                            </button>
+                                        </span>
+                                        <span v-else>No users available</span>
+                                    </div>
+                                </div>
+                            </TableCell>
+                        </TableRow>
+                        <TableRow v-for="user in filteredUsers" :key="user.id">
                             <TableCell class="font-medium">{{ user.name }}</TableCell>
                             <TableCell>{{ user.email }}</TableCell>
                             <TableCell>{{ user.username || '-' }}</TableCell>
@@ -328,12 +435,18 @@ const toggleUserStatus = async (user: User) => {
                 </Table>
             </div>
 
-            <!-- Pagination would go here -->
-            <div v-if="users.last_page > 1" class="flex items-center justify-between">
+            <!-- Results summary -->
+            <div class="flex items-center justify-between">
                 <div class="text-sm text-muted-foreground">
-                    Showing {{ (users.current_page - 1) * users.per_page + 1 }} to 
-                    {{ Math.min(users.current_page * users.per_page, users.total) }} of 
-                    {{ users.total }} results
+                    <span v-if="hasActiveFilters">
+                        Showing {{ filteredUsers.length }} of {{ users.total }} users
+                        <span class="ml-2 text-blue-600">(filtered)</span>
+                    </span>
+                    <span v-else>
+                        Showing {{ (users.current_page - 1) * users.per_page + 1 }} to 
+                        {{ Math.min(users.current_page * users.per_page, users.total) }} of 
+                        {{ users.total }} results
+                    </span>
                 </div>
                 <!-- Add pagination component here if needed -->
             </div>
