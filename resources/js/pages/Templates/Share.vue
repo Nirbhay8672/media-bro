@@ -333,8 +333,6 @@ const generateImage = async () => {
                     transformOrigin: 'top left',
                     width: originalWidth + 'px',
                     height: originalHeight + 'px',
-                    imageRendering: 'high-quality',
-                    imageRendering: '-webkit-optimize-contrast',
                     imageRendering: 'crisp-edges'
                 },
                 pixelRatio: 4, // Ultra high DPI

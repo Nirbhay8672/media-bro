@@ -93,14 +93,24 @@
               <label for="password" class="block text-sm font-medium text-gray-700 dark:text-gray-300">
                 Password {{ isEditMode ? '(leave blank to keep current)' : '*' }}
               </label>
-              <input
-                id="password"
-                v-model="form.password"
-                type="password"
-                :required="!isEditMode"
-                class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
-                :class="{ 'border-red-500': form.errors.password }"
-              />
+              <div class="relative">
+                <input
+                  id="password"
+                  v-model="form.password"
+                  :type="showPassword ? 'text' : 'password'"
+                  :required="!isEditMode"
+                  class="w-full px-3 py-2 pr-10 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                  :class="{ 'border-red-500': form.errors.password }"
+                />
+                <button
+                  type="button"
+                  @click="showPassword = !showPassword"
+                  class="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                >
+                  <Eye v-if="!showPassword" class="h-4 w-4" />
+                  <EyeOff v-else class="h-4 w-4" />
+                </button>
+              </div>
               <p v-if="form.errors.password" class="text-sm text-red-500">
                 {{ form.errors.password }}
               </p>
@@ -110,14 +120,24 @@
               <label for="password_confirmation" class="block text-sm font-medium text-gray-700 dark:text-gray-300">
                 Confirm Password {{ isEditMode ? '' : '*' }}
               </label>
-              <input
-                id="password_confirmation"
-                v-model="form.password_confirmation"
-                type="password"
-                :required="!isEditMode"
-                class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
-                :class="{ 'border-red-500': form.errors.password_confirmation }"
-              />
+              <div class="relative">
+                <input
+                  id="password_confirmation"
+                  v-model="form.password_confirmation"
+                  :type="showConfirmPassword ? 'text' : 'password'"
+                  :required="!isEditMode"
+                  class="w-full px-3 py-2 pr-10 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                  :class="{ 'border-red-500': form.errors.password_confirmation }"
+                />
+                <button
+                  type="button"
+                  @click="showConfirmPassword = !showConfirmPassword"
+                  class="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                >
+                  <Eye v-if="!showConfirmPassword" class="h-4 w-4" />
+                  <EyeOff v-else class="h-4 w-4" />
+                </button>
+              </div>
               <p v-if="form.errors.password_confirmation" class="text-sm text-red-500">
                 {{ form.errors.password_confirmation }}
               </p>
@@ -204,10 +224,11 @@
 
 <script setup lang="ts">
 import { useForm } from '@inertiajs/vue3';
-import { watch, computed } from 'vue';
+import { watch, computed, ref } from 'vue';
 import users from '@/routes/users';
 import type { User } from '@/types';
 import Swal from 'sweetalert2';
+import { Eye, EyeOff } from 'lucide-vue-next';
 
 interface Props {
   isOpen: boolean;
@@ -221,6 +242,10 @@ const emit = defineEmits<{
 }>();
 
 const isEditMode = computed(() => !!props.user);
+
+// Password visibility states
+const showPassword = ref(false);
+const showConfirmPassword = ref(false);
 
 const form = useForm({
   name: '',
@@ -238,6 +263,9 @@ const form = useForm({
 const closeModal = () => {
   form.reset();
   form.clearErrors();
+  // Reset password visibility states
+  showPassword.value = false;
+  showConfirmPassword.value = false;
   emit('close');
 };
 

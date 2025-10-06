@@ -45,6 +45,7 @@ const togglingUsers = ref<Set<number>>(new Set());
 // Filter states
 const templateLimitFilter = ref('');
 const statusFilter = ref('');
+const memoryFilter = ref('');
 const searchQuery = ref('');
 
 // Sort states
@@ -146,6 +147,10 @@ const filteredUsers = computed(() => {
                     aValue = a.templates_count || 0;
                     bValue = b.templates_count || 0;
                     break;
+                case 'memory_usage':
+                    aValue = a.memory_usage || 0;
+                    bValue = b.memory_usage || 0;
+                    break;
                 default:
                     return 0;
             }
@@ -163,6 +168,23 @@ const filteredUsers = computed(() => {
 
 const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString();
+};
+
+// Format memory usage in bytes to human readable format
+const formatMemoryUsage = (bytes: number) => {
+    if (bytes === 0) return '0 B';
+    
+    const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+    const k = 1024;
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + units[i];
+};
+
+// Check if user subscription is expired
+const isSubscriptionExpired = (user: User) => {
+    if (!user.subscription_end_date) return false;
+    return new Date(user.subscription_end_date) < new Date();
 };
 
 const openCreateModal = () => {
@@ -290,6 +312,7 @@ const applyFilters = () => {
 const clearFilters = () => {
     templateLimitFilter.value = '';
     statusFilter.value = '';
+    memoryFilter.value = '';
     searchQuery.value = '';
     sortBy.value = '';
     sortDirection.value = 'asc';
@@ -392,6 +415,26 @@ const getSortIcon = (field: string) => {
                     </select>
                 </div>
 
+                <div class="flex items-center gap-2">
+                    <label for="memory-filter" class="text-sm font-medium text-gray-700 dark:text-gray-300">
+                        Memory Usage:
+                    </label>
+                    <select
+                        id="memory-filter"
+                        v-model="memoryFilter"
+                        @change="applyFilters"
+                        class="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-sm"
+                    >
+                        <option value="">All Usage</option>
+                        <option value="0">No Usage (0 B)</option>
+                        <option value="1mb">Low Usage (< 1 MB)</option>
+                        <option value="10mb">Medium Usage (< 10 MB)</option>
+                        <option value="100mb">High Usage (< 100 MB)</option>
+                        <option value="1gb">Very High Usage (< 1 GB)</option>
+                        <option value="1gb+">Extreme Usage (1+ GB)</option>
+                    </select>
+                </div>
+
 
                 <Button
                     v-if="hasActiveFilters"
@@ -414,26 +457,8 @@ const getSortIcon = (field: string) => {
                                     @click="handleSort('name')"
                                     class="flex items-center gap-1 hover:text-blue-600 dark:hover:text-blue-400"
                                 >
-                                    Name
+                                    User Details
                                     <component :is="getSortIcon('name')" class="h-3 w-3" />
-                                </button>
-                            </TableHead>
-                            <TableHead>
-                                <button
-                                    @click="handleSort('email')"
-                                    class="flex items-center gap-1 hover:text-blue-600 dark:hover:text-blue-400"
-                                >
-                                    Email
-                                    <component :is="getSortIcon('email')" class="h-3 w-3" />
-                                </button>
-                            </TableHead>
-                            <TableHead>
-                                <button
-                                    @click="handleSort('username')"
-                                    class="flex items-center gap-1 hover:text-blue-600 dark:hover:text-blue-400"
-                                >
-                                    Username
-                                    <component :is="getSortIcon('username')" class="h-3 w-3" />
                                 </button>
                             </TableHead>
                             <TableHead>
@@ -472,12 +497,21 @@ const getSortIcon = (field: string) => {
                                     <component :is="getSortIcon('templates_count')" class="h-3 w-3" />
                                 </button>
                             </TableHead>
+                            <TableHead>
+                                <button
+                                    @click="handleSort('memory_usage')"
+                                    class="flex items-center gap-1 hover:text-blue-600 dark:hover:text-blue-400"
+                                >
+                                    Memory Usage
+                                    <component :is="getSortIcon('memory_usage')" class="h-3 w-3" />
+                                </button>
+                            </TableHead>
                             <TableHead class="w-[50px]"></TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
                         <TableRow v-if="filteredUsers.length === 0">
-                            <TableCell colspan="8" class="text-center py-8 text-muted-foreground">
+                            <TableCell colspan="7" class="text-center py-8 text-muted-foreground">
                                 <div class="flex flex-col items-center gap-2">
                                     <div class="text-lg font-medium">No users found</div>
                                     <div class="text-sm">
@@ -500,36 +534,32 @@ const getSortIcon = (field: string) => {
                             </TableCell>
                         </TableRow>
                         <TableRow v-for="user in filteredUsers" :key="user.id">
-                            <TableCell class="font-medium">{{ user.name }}</TableCell>
-                            <TableCell>{{ user.email }}</TableCell>
-                            <TableCell>{{ user.username || '-' }}</TableCell>
                             <TableCell>
-                                <div class="flex items-center gap-3">
-                                    <div class="flex items-center gap-2">
-                                        <div 
-                                            :class="[
-                                                'w-2 h-2 rounded-full',
-                                                user.is_active ? 'bg-green-500' : 'bg-gray-400'
-                                            ]"
-                                        ></div>
-                                        <span 
-                                            :class="[
-                                                'text-sm font-medium',
-                                                user.is_active ? 'text-green-700' : 'text-gray-500'
-                                            ]"
-                                        >
-                                            {{ user.is_active ? 'Active' : 'Inactive' }}
+                                <div class="space-y-1">
+                                    <div class="font-medium text-gray-900 dark:text-white">
+                                        {{ user.name }} 
+                                        <span class="text-sm text-gray-500 dark:text-gray-400 font-normal">
+                                            @{{ user.username || 'No username' }}
                                         </span>
                                     </div>
-                                    
+                                    <div class="text-sm text-gray-600 dark:text-gray-400">
+                                        {{ user.email }}
+                                    </div>
+                                </div>
+                            </TableCell>
+                            <TableCell>
+                                <div class="flex items-center gap-3">
                                     <button
                                         v-if="user.role !== 'super_admin'"
                                         @click="toggleUserStatus(user)"
                                         :disabled="togglingUsers.has(user.id)"
                                         :title="user.is_active ? 'Click to deactivate account' : 'Click to activate account'"
                                         :class="[
-                                            'relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2',
-                                            user.is_active ? 'bg-indigo-600' : 'bg-gray-200',
+                                            'relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2',
+                                            // Red background if subscription is expired, otherwise normal colors
+                                            isSubscriptionExpired(user) 
+                                                ? (user.is_active ? 'bg-red-600 focus:ring-red-500' : 'bg-red-200')
+                                                : (user.is_active ? 'bg-indigo-600 focus:ring-indigo-500' : 'bg-gray-200 focus:ring-indigo-500'),
                                             togglingUsers.has(user.id) ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:opacity-80'
                                         ]"
                                     >
@@ -545,13 +575,30 @@ const getSortIcon = (field: string) => {
                                             class="h-3 w-3 animate-spin text-white mx-auto"
                                         />
                                     </button>
+                                    <div class="flex items-center gap-2">
+                                        <div 
+                                            :class="[
+                                                'w-2 h-2 rounded-full',
+                                                // Red dot if subscription is expired, otherwise normal colors
+                                                isSubscriptionExpired(user) 
+                                                    ? (user.is_active ? 'bg-red-500' : 'bg-red-300')
+                                                    : (user.is_active ? 'bg-green-500' : 'bg-gray-400')
+                                            ]"
+                                        ></div>
+                                        <span 
+                                            :class="[
+                                                'text-sm font-medium',
+                                                // Red text if subscription is expired, otherwise normal colors
+                                                isSubscriptionExpired(user) 
+                                                    ? (user.is_active ? 'text-red-700' : 'text-red-500')
+                                                    : (user.is_active ? 'text-green-700' : 'text-gray-500')
+                                            ]"
+                                        >
+                                            {{ user.is_active ? 'Active' : 'Inactive' }}
+                                        </span>
+                                    </div>
                                     
-                                    <span 
-                                        v-else 
-                                        class="text-xs text-gray-400 italic"
-                                    >
-                                        Super Admin
-                                    </span>
+
                                 </div>
                             </TableCell>
                             <TableCell>
@@ -578,6 +625,16 @@ const getSortIcon = (field: string) => {
                                 <Badge variant="secondary">
                                     {{ user.templates_count || 0 }} templates
                                 </Badge>
+                            </TableCell>
+                            <TableCell>
+                                <div class="flex items-center gap-2">
+                                    <div class="text-sm font-medium">
+                                        {{ formatMemoryUsage(user.memory_usage || 0) }}
+                                    </div>
+                                    <div v-if="user.memory_usage > 0" class="text-xs text-muted-foreground">
+                                        ({{ user.templates_count || 0 }} files)
+                                    </div>
+                                </div>
                             </TableCell>
                             <TableCell>
                                 <DropdownMenu>
@@ -622,9 +679,9 @@ const getSortIcon = (field: string) => {
                         </span>
                     </span>
                     <span v-else>
-                        Showing {{ (users.current_page - 1) * users.per_page + 1 }} to 
-                        {{ Math.min(users.current_page * users.per_page, users.total) }} of 
-                        {{ users.total }} results
+                    Showing {{ (users.current_page - 1) * users.per_page + 1 }} to 
+                    {{ Math.min(users.current_page * users.per_page, users.total) }} of 
+                    {{ users.total }} results
                     </span>
                 </div>
                 <!-- Add pagination component here if needed -->

@@ -42,6 +42,7 @@ export interface User {
     created_at: string;
     updated_at: string;
     templates_count?: number;
+    memory_usage?: number; // Memory usage in bytes
 }
 
 export type BreadcrumbItemType = BreadcrumbItem;

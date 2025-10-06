@@ -14,9 +14,30 @@ class UserController extends Controller
     public function index(): Response
     {
         $users = User::withCount('templates')
+            ->with(['templates' => function($query) {
+                $query->select('id', 'user_id', 'background_image');
+            }])
             ->orderBy('created_at', 'desc')
             ->where('role', 'admin')
             ->paginate(500);
+        
+        // Calculate memory usage for each user
+        $users->getCollection()->transform(function ($user) {
+            $memoryUsage = 0;
+            
+            // Calculate total size of background images
+            foreach ($user->templates as $template) {
+                if ($template->background_image) {
+                    $imagePath = storage_path('app/public/' . $template->background_image);
+                    if (file_exists($imagePath)) {
+                        $memoryUsage += filesize($imagePath);
+                    }
+                }
+            }
+            
+            $user->memory_usage = $memoryUsage;
+            return $user;
+        });
         
         return Inertia::render('Users/Index', [
             'users' => $users
