@@ -280,29 +280,83 @@ const generateImage = async () => {
             height: previewElement.offsetHeight
         });
 
-        // Use dom-to-image with optimized settings for reliability
+        // Ultra high quality rendering with multiple fallback methods
         let dataUrl;
+        const originalWidth = props.template.width;
+        const originalHeight = props.template.height;
+        
         try {
+            // Method 1: Ultra high quality with custom scaling
+            const scaleFactor = 4; // 4x scale for ultra high quality
+            const ultraWidth = originalWidth * scaleFactor;
+            const ultraHeight = originalHeight * scaleFactor;
+            
             dataUrl = await domtoimage.toPng(previewElement, {
                 quality: 1.0,
                 bgcolor: '#ffffff',
-                width: previewElement.offsetWidth,
-                height: previewElement.offsetHeight,
+                width: ultraWidth,
+                height: ultraHeight,
                 style: {
-                    transform: 'scale(1)',
-                    transformOrigin: 'top left'
+                    transform: `scale(${scaleFactor})`,
+                    transformOrigin: 'top left',
+                    width: originalWidth + 'px',
+                    height: originalHeight + 'px',
+                    imageRendering: 'high-quality',
+                    imageRendering: '-webkit-optimize-contrast',
+                    imageRendering: 'crisp-edges'
                 },
-                pixelRatio: 2, // High DPI support for better quality
-                cacheBust: true // Ensure fresh rendering
+                pixelRatio: 4, // Ultra high DPI
+                cacheBust: true,
+                filter: (node) => {
+                    // Include all elements for maximum detail
+                    return true;
+                },
+                // Additional quality options
+                useCORS: true,
+                allowTaint: true
             });
-        } catch (domError) {
-            console.warn('dom-to-image failed, trying fallback method:', domError);
             
-            // Fallback: Try with simpler settings
-            dataUrl = await domtoimage.toPng(previewElement, {
-                quality: 1.0,
-                bgcolor: '#ffffff'
+            console.log('Ultra high quality image generated:', {
+                originalSize: `${originalWidth}x${originalHeight}`,
+                renderedSize: `${ultraWidth}x${ultraHeight}`,
+                scaleFactor: scaleFactor,
+                dataUrlLength: dataUrl.length
             });
+            
+        } catch (ultraError) {
+            console.warn('Ultra quality method failed, trying high quality fallback:', ultraError);
+            
+            try {
+                // Method 2: High quality fallback
+                dataUrl = await domtoimage.toPng(previewElement, {
+                    quality: 1.0,
+                    bgcolor: '#ffffff',
+                    width: originalWidth * 2, // 2x scale
+                    height: originalHeight * 2,
+                    style: {
+                        transform: 'scale(2)',
+                        transformOrigin: 'top left',
+                        width: originalWidth + 'px',
+                        height: originalHeight + 'px'
+                    },
+                    pixelRatio: 3,
+                    cacheBust: true,
+                    useCORS: true
+                });
+                
+            } catch (highError) {
+                console.warn('High quality method failed, trying standard quality:', highError);
+                
+                // Method 3: Standard quality as last resort
+                dataUrl = await domtoimage.toPng(previewElement, {
+                    quality: 1.0,
+                    bgcolor: '#ffffff',
+                    width: originalWidth,
+                    height: originalHeight,
+                    pixelRatio: 2,
+                    cacheBust: true
+                });
+            }
         }
 
         console.log('Image generated successfully, data URL length:', dataUrl.length);
