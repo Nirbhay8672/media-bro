@@ -527,7 +527,7 @@ const generateImage = async () => {
                             <div class="flex justify-center items-start min-h-[400px]">
                                 <div class="relative" style="margin: 20px 0;">
                                     <div
-                                        class="template-preview-container relative overflow-hidden border-2 border-gray-300 bg-gray-50 dark:border-gray-600 dark:bg-gray-700 shadow-lg rounded-lg"
+                                        class="template-preview-container relative overflow-hidden bg-gray-50 dark:bg-gray-700 shadow-lg"
                                         :style="canvasStyle"
                                         @mousemove="handleMouseMove"
                                         @mouseup="handleMouseUp"

@@ -323,7 +323,7 @@ const getImageClipPath = (shape: string) => {
                 <div class="relative w-full max-w-full overflow-hidden" style="margin: 10px 0;">
                         <!-- Canvas -->
                         <div
-                            class="relative overflow-hidden border-2 border-gray-300 bg-gray-50 dark:border-gray-600 dark:bg-gray-700 shadow-lg rounded-lg cursor-crosshair mx-auto"
+                            class="relative overflow-hidden bg-gray-50 dark:bg-gray-700 shadow-lg cursor-crosshair mx-auto"
                             :style="canvasStyle"
                             @click="handleCanvasClick"
                             @mousemove="handleMouseMove"
@@ -336,10 +336,6 @@ const getImageClipPath = (shape: string) => {
                                 height: '100%'
                             }"></div>
                             
-                            <!-- Debug: Show background image status -->
-                            <div v-if="backgroundImagePreview" class="absolute top-2 left-2 bg-black bg-opacity-50 text-white text-xs px-2 py-1 rounded z-10">
-                                Background loaded
-                            </div>
 
                             <!-- Empty State -->
                             <div v-if="!backgroundImagePreview && canvasElements.length === 0" class="flex h-full w-full items-center justify-center">
