@@ -274,11 +274,43 @@ const generateImage = async () => {
             throw new Error('Preview container not found');
         }
 
-        console.log('Preview element found:', previewElement);
-        console.log('Element dimensions:', {
-            width: previewElement.offsetWidth,
-            height: previewElement.offsetHeight
-        });
+
+        // Convert all blob URLs to data URLs before rendering
+        const convertBlobUrlsToDataUrls = async () => {
+            const images = previewElement.querySelectorAll('img');
+            
+            const conversionPromises = Array.from(images).map(async (img, index) => {
+                if (img.src.startsWith('blob:')) {
+                    try {
+                        const response = await fetch(img.src);
+                        if (!response.ok) {
+                            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                        }
+                        const blob = await response.blob();
+                        return new Promise((resolve) => {
+                            const reader = new FileReader();
+                            reader.onload = () => {
+                                img.src = reader.result as string;
+                                resolve(true);
+                            };
+                            reader.onerror = () => {
+                                resolve(false);
+                            };
+                            reader.readAsDataURL(blob);
+                        });
+                    } catch (error) {
+                        return false;
+                    }
+                } else {
+                    return true;
+                }
+            });
+            
+            await Promise.all(conversionPromises);
+        };
+
+        // Convert blob URLs first
+        await convertBlobUrlsToDataUrls();
 
         // Ultra high quality rendering with multiple fallback methods
         let dataUrl;
@@ -316,15 +348,8 @@ const generateImage = async () => {
                 allowTaint: true
             });
             
-            console.log('Ultra high quality image generated:', {
-                originalSize: `${originalWidth}x${originalHeight}`,
-                renderedSize: `${ultraWidth}x${ultraHeight}`,
-                scaleFactor: scaleFactor,
-                dataUrlLength: dataUrl.length
-            });
             
         } catch (ultraError) {
-            console.warn('Ultra quality method failed, trying high quality fallback:', ultraError);
             
             try {
                 // Method 2: High quality fallback
@@ -345,7 +370,6 @@ const generateImage = async () => {
                 });
                 
             } catch (highError) {
-                console.warn('High quality method failed, trying standard quality:', highError);
                 
                 // Method 3: Standard quality as last resort
                 dataUrl = await domtoimage.toPng(previewElement, {
@@ -359,7 +383,6 @@ const generateImage = async () => {
             }
         }
 
-        console.log('Image generated successfully, data URL length:', dataUrl.length);
 
         // Create download link with timestamp
         const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
@@ -372,7 +395,6 @@ const generateImage = async () => {
 
         // Track the download
         try {
-            console.log('Tracking download for template:', props.template.share_token);
             const response = await fetch(`/template/${props.template.share_token}/track-download`, {
                 method: 'POST',
                 headers: {
@@ -385,14 +407,8 @@ const generateImage = async () => {
                     file_size: dataUrl.length // Approximate file size
                 })
             });
-            
-            if (response.ok) {
-                console.log('Download tracked successfully');
-            } else {
-                console.error('Failed to track download:', response.status, response.statusText);
-            }
-    } catch (error) {
-            console.error('Failed to track download:', error);
+        } catch (error) {
+            // Silent error handling for tracking
         }
 
         // Close loading and show success
@@ -409,7 +425,6 @@ const generateImage = async () => {
         });
 
     } catch (error: any) {
-        console.error('Error generating image:', error);
         
         // Close loading and show error
         Swal.close();
