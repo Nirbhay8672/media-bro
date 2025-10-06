@@ -78,6 +78,7 @@ const handleBackgroundImageChange = (event: Event) => {
 // Window width for responsive design
 const windowWidth = ref(typeof window !== 'undefined' ? window.innerWidth : 1024);
 
+
 // Update window width on resize
 const updateWindowWidth = () => {
     windowWidth.value = window.innerWidth;
@@ -91,23 +92,29 @@ onUnmounted(() => {
     window.removeEventListener('resize', updateWindowWidth);
 });
 
-const canvasStyle = computed(() => {
-    // Calculate scale to fit within viewport while maintaining aspect ratio
-    const maxWidth = windowWidth.value < 1024 ? 400 : 600; // Smaller on mobile/tablet
-    const maxHeight = windowWidth.value < 1024 ? 300 : 450; // Smaller on mobile/tablet
+// Calculate responsive canvas dimensions
+const canvasDimensions = computed(() => {
+    const maxWidth = windowWidth.value < 1024 ? 400 : 600;
+    const maxHeight = windowWidth.value < 1024 ? 300 : 450;
+    
+    // Calculate scale to fit within max dimensions while maintaining aspect ratio
     const scaleX = maxWidth / props.form.width;
     const scaleY = maxHeight / props.form.height;
-    const scale = Math.min(scaleX, scaleY, 1); // Don't scale up
+    const scale = Math.min(scaleX, scaleY, 1); // Never scale up beyond original size
     
     return {
-        width: props.form.width + 'px',
-        height: props.form.height + 'px',
-        transform: `scale(${scale})`,
-        transformOrigin: 'top center',
-        maxWidth: '100%',
-        maxHeight: '100%'
+        width: props.form.width * scale,
+        height: props.form.height * scale,
+        scale: scale
     };
 });
+
+// Calculate canvas scale factor - now only responsive, no manual zoom
+const canvasScale = computed(() => {
+    return canvasDimensions.value.scale;
+});
+
+// Canvas style is now handled by the container div
 
 const sortedElements = computed(() => {
     return [...props.canvasElements].sort((a, b) => a.zIndex - b.zIndex);
@@ -195,8 +202,15 @@ const handleResize = (event: MouseEvent) => {
     const deltaX = event.clientX - resizeStart.value.x;
     const deltaY = event.clientY - resizeStart.value.y;
     
-    let newWidth = Math.max(20, resizeStart.value.width + deltaX);
-    let newHeight = Math.max(20, resizeStart.value.height + deltaY);
+    // Get the actual canvas scale (responsive scale only)
+    const actualScale = canvasDimensions.value.scale;
+    
+    // Adjust deltas for canvas scaling
+    const scaledDeltaX = deltaX / actualScale;
+    const scaledDeltaY = deltaY / actualScale;
+    
+    let newWidth = Math.max(20, resizeStart.value.width + scaledDeltaX);
+    let newHeight = Math.max(20, resizeStart.value.height + scaledDeltaY);
     
     // Check if Shift is pressed for proportional resizing
     const isShiftPressed = event.shiftKey;
@@ -204,7 +218,7 @@ const handleResize = (event: MouseEvent) => {
     if (isShiftPressed) {
         // Proportional resizing - maintain aspect ratio
         const aspectRatio = resizeStart.value.width / resizeStart.value.height;
-        const maxDelta = Math.max(deltaX, deltaY);
+        const maxDelta = Math.max(scaledDeltaX, scaledDeltaY);
         newWidth = Math.max(20, resizeStart.value.width + maxDelta);
         newHeight = Math.max(20, resizeStart.value.height + maxDelta);
     }
@@ -277,6 +291,7 @@ const getImageClipPath = (shape: string) => {
                         </div>
                     </div>
                     
+
                     <!-- Vertical Action Buttons -->
                     <div class="flex items-center gap-1">
                         <button
@@ -320,15 +335,26 @@ const getImageClipPath = (shape: string) => {
             </div>
 
             <div class="p-2 sm:p-4 flex justify-center items-start min-h-[300px] sm:min-h-[400px]">
-                <div class="relative w-full max-w-full overflow-hidden" style="margin: 10px 0;">
-                        <!-- Canvas -->
-                        <div
-                            class="relative overflow-hidden bg-gray-50 dark:bg-gray-700 shadow-lg cursor-crosshair mx-auto"
-                            :style="canvasStyle"
-                            @click="handleCanvasClick"
-                            @mousemove="handleMouseMove"
-                            @mouseup="handleMouseUp"
-                        >
+                <div class="relative w-full max-w-full overflow-hidden flex justify-center" style="margin: 10px 0;">
+                        <!-- Canvas Container -->
+                        <div class="canvas-container" :style="{ 
+                            width: canvasDimensions.width + 'px', 
+                            height: canvasDimensions.height + 'px',
+                            transform: `scale(${canvasScale})`,
+                            transformOrigin: 'top center',
+                            margin: '0 auto'
+                        }">
+                            <!-- Canvas -->
+                            <div
+                                class="relative overflow-hidden bg-gray-50 dark:bg-gray-700 shadow-lg cursor-crosshair"
+                                :style="{
+                                    width: props.form.width + 'px',
+                                    height: props.form.height + 'px'
+                                }"
+                                @click="handleCanvasClick"
+                                @mousemove="handleMouseMove"
+                                @mouseup="handleMouseUp"
+                            >
                             <!-- Background Image -->
                             <div v-if="backgroundImagePreview" class="absolute inset-0 bg-cover bg-center bg-no-repeat z-0" :style="{ 
                                 backgroundImage: `url(${backgroundImagePreview})`,
@@ -441,6 +467,7 @@ const getImageClipPath = (shape: string) => {
                                 <div v-if="selectedElement?.id === element.id" class="absolute -bottom-1 -right-1 w-4 h-4 bg-blue-500 border-2 border-white rounded-full pointer-events-auto cursor-se-resize hover:bg-blue-600 transition-colors shadow-lg" @mousedown="handleResizeStart($event, element)" title="Resize (Shift+drag for proportional)"></div>
                             </div>
                         </div>
+                        </div> <!-- Close canvas container -->
                     </div>
                 </div>
             </div>

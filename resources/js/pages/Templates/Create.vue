@@ -201,13 +201,40 @@ const handleCanvasClick = (event: MouseEvent) => {
     }
 };
 
+// Calculate canvas scale factor - now uses the responsive system from CanvasEditor
+const getCanvasScale = () => {
+    // Get the actual canvas element from CanvasEditor
+    const canvasElement = document.querySelector('.template-preview-container');
+    if (canvasElement) {
+        const canvasRect = canvasElement.getBoundingClientRect();
+        
+        // Calculate responsive scale
+        const maxWidth = window.innerWidth < 1024 ? 400 : 600;
+        const maxHeight = window.innerWidth < 1024 ? 300 : 450;
+        const scaleX = maxWidth / form.value.width;
+        const scaleY = maxHeight / form.value.height;
+        const responsiveScale = Math.min(scaleX, scaleY, 1);
+        
+        // Get the actual displayed scale (responsive scale * zoom scale)
+        const displayedWidth = form.value.width * responsiveScale;
+        const displayedHeight = form.value.height * responsiveScale;
+        const actualScaleX = canvasRect.width / displayedWidth;
+        const actualScaleY = canvasRect.height / displayedHeight;
+        
+        return Math.min(actualScaleX, actualScaleY, 1) * responsiveScale;
+    }
+    return 1;
+};
+
 const handleElementMouseDown = (event: MouseEvent, element: CanvasElement) => {
     if (selectedTool.value === 'select') {
         event.preventDefault();
         isDragging.value = true;
+        
+        const scale = getCanvasScale();
         dragStart.value = {
-            x: event.clientX - element.x,
-            y: event.clientY - element.y
+            x: event.clientX - (element.x * scale),
+            y: event.clientY - (element.y * scale)
         };
         selectedElement.value = element;
     }
@@ -215,8 +242,9 @@ const handleElementMouseDown = (event: MouseEvent, element: CanvasElement) => {
 
 const handleMouseMove = (event: MouseEvent) => {
     if (isDragging.value && selectedElement.value) {
-        selectedElement.value.x = event.clientX - dragStart.value.x;
-        selectedElement.value.y = event.clientY - dragStart.value.y;
+        const scale = getCanvasScale();
+        selectedElement.value.x = (event.clientX - dragStart.value.x) / scale;
+        selectedElement.value.y = (event.clientY - dragStart.value.y) / scale;
     }
 };
 
