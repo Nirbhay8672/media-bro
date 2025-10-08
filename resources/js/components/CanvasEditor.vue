@@ -423,7 +423,7 @@ const getImageClipPath = (shape: string) => {
                                         :src="element.properties.imageUrl"
                                         :alt="element.properties.text || 'Image'"
                                         class="max-w-full max-h-full"
-                                        :style="{ objectFit: element.properties.imageFit || 'contain' } as any"
+                                        :style="{ objectFit: element.properties.imageFit || 'cover' } as any"
                                     />
                                     <div v-else class="w-full h-full flex items-center justify-center text-blue-500 bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-blue-900/20 dark:to-indigo-900/20 border-2 border-dashed border-blue-300 dark:border-blue-600 rounded-lg cursor-pointer hover:from-blue-100 hover:to-indigo-200 dark:hover:from-blue-800/30 dark:hover:to-indigo-800/30 hover:border-blue-400 dark:hover:border-blue-500 transition-all duration-200" @click="handlePlaceholderClick(element)">
                                         <div class="relative">

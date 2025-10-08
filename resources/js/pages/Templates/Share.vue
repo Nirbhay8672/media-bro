@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Head } from '@inertiajs/vue3';
-import { Download, Type, Image, Upload } from 'lucide-vue-next';
+import { Download, Type, Image, Upload, X, Plus, Minus, Move } from 'lucide-vue-next';
 import { ref, computed } from 'vue';
 import * as domtoimage from 'dom-to-image';
 import Swal from 'sweetalert2';
@@ -56,6 +56,7 @@ interface CanvasElement {
         imageUrl?: string;
         imageFit?: string;
         imagePlaceholder?: string;
+        imageShape?: string;
     };
 }
 
@@ -67,6 +68,16 @@ const props = defineProps<{
 const selectedElement = ref<CanvasElement | null>(null);
 const isGenerating = ref(false);
 
+// Image cropping state
+const isCroppingModalOpen = ref(false);
+const cropImageUrl = ref<string>('');
+const cropElement = ref<CanvasElement | null>(null);
+const cropScale = ref(0.5);
+const cropPositionX = ref(0);
+const cropPositionY = ref(0);
+const cropOpacity = ref(1);
+const isDraggingImage = ref(false);
+const dragImageStart = ref({ x: 0, y: 0, posX: 0, posY: 0 });
 
 const canvasElements = ref<CanvasElement[]>([]);
 
@@ -84,6 +95,12 @@ const initializeCanvasElements = () => {
         }
     } else {
         templateData = [];
+    }
+
+    // Debug: Log template data for image elements
+    const imageElements = templateData.filter((el: any) => el.type === 'image');
+    if (imageElements.length > 0) {
+        console.log('Template image elements:', imageElements);
     }
 
     canvasElements.value = templateData.map((element: any) => ({
@@ -117,6 +134,7 @@ const initializeCanvasElements = () => {
             imageUrl: element.properties?.imageUrl || '',
             imageFit: element.properties?.imageFit || 'cover',
             imagePlaceholder: element.properties?.imagePlaceholder || (element.type === 'image' ? 'Click to upload image' : ''),
+            imageShape: element.properties?.imageShape || 'rectangle',
         }
     }));
 };
@@ -231,10 +249,87 @@ const handleImageUpload = (event: Event, element: CanvasElement) => {
 
     
     const imageUrl = URL.createObjectURL(file);
-    element.properties.imageUrl = imageUrl;
-
     
+    // Open cropping modal
+    cropImageUrl.value = imageUrl;
+    cropElement.value = element;
+    cropScale.value = 0.5;
+    cropPositionX.value = 0;
+    cropPositionY.value = 0;
+    cropOpacity.value = 1;
+    isCroppingModalOpen.value = true;
+    
+    // Store file for later
     (element as any).uploadedFile = file;
+};
+
+// Crop control functions
+const zoomIn = () => {
+    cropScale.value = Math.min(cropScale.value + 0.1, 3);
+};
+
+const zoomOut = () => {
+    cropScale.value = Math.max(cropScale.value - 0.1, 0.5);
+};
+
+const startImageDrag = (event: MouseEvent) => {
+    isDraggingImage.value = true;
+    dragImageStart.value = {
+        x: event.clientX,
+        y: event.clientY,
+        posX: cropPositionX.value,
+        posY: cropPositionY.value
+    };
+};
+
+const onImageDrag = (event: MouseEvent) => {
+    if (!isDraggingImage.value || !cropElement.value) return;
+    
+    const deltaX = event.clientX - dragImageStart.value.x;
+    const deltaY = event.clientY - dragImageStart.value.y;
+    
+    // Scale the movement based on the crop scale
+    const scaledDeltaX = deltaX / cropScale.value;
+    const scaledDeltaY = deltaY / cropScale.value;
+    
+    cropPositionX.value = dragImageStart.value.posX + scaledDeltaX;
+    cropPositionY.value = dragImageStart.value.posY + scaledDeltaY;
+};
+
+const stopImageDrag = () => {
+    isDraggingImage.value = false;
+};
+
+const applyCrop = () => {
+    if (cropElement.value) {
+        cropElement.value.properties.imageUrl = cropImageUrl.value;
+        // Store crop settings in element properties
+        (cropElement.value.properties as any).cropScale = cropScale.value;
+        (cropElement.value.properties as any).cropPositionX = cropPositionX.value;
+        (cropElement.value.properties as any).cropPositionY = cropPositionY.value;
+        
+        // Debug: Log the applied settings
+        console.log('Applied crop settings:', {
+            imageShape: cropElement.value.properties.imageShape,
+            cropScale: cropScale.value,
+            cropPositionX: cropPositionX.value,
+            cropPositionY: cropPositionY.value,
+            imageUrl: cropImageUrl.value
+        });
+    }
+    closeCropModal();
+};
+
+const closeCropModal = () => {
+    isCroppingModalOpen.value = false;
+    if (cropImageUrl.value && cropImageUrl.value.startsWith('blob:')) {
+        // Don't revoke if applied, only if cancelled without element having it
+        if (!cropElement.value?.properties.imageUrl || cropElement.value.properties.imageUrl !== cropImageUrl.value) {
+            URL.revokeObjectURL(cropImageUrl.value);
+        }
+    }
+    cropImageUrl.value = '';
+    cropElement.value = null;
 };
 
 
@@ -637,18 +732,33 @@ const generateImage = async () => {
                                         </div>
 
                                         <!-- Image Element -->
-                                        <div v-else-if="element.type === 'image'" class="w-full h-full flex items-center justify-center" :style="{
+                                        <div v-else-if="element.type === 'image'" class="w-full h-full flex items-center justify-center overflow-hidden relative" :style="{
                                             backgroundColor: element.properties.backgroundColor || 'transparent',
                                             border: element.properties.hasBorder ? `${element.properties.strokeWidth}px ${element.properties.borderStyle} ${element.properties.strokeColor}` : 'none',
                                             borderRadius: element.properties.borderRadius + 'px',
                                             clipPath: getImageClipPath(element.properties.imageShape || 'rectangle')
-                                        }">
+                                        }" @click="console.log('Image element properties:', {
+                                            imageShape: element.properties.imageShape,
+                                            cropScale: (element.properties as any).cropScale,
+                                            cropPositionX: (element.properties as any).cropPositionX,
+                                            cropPositionY: (element.properties as any).cropPositionY,
+                                            imageUrl: element.properties.imageUrl
+                                        })">
                                             <img
                                                 v-if="element.properties.imageUrl"
                                                 :src="element.properties.imageUrl"
                                                 :alt="element.properties.imagePlaceholder"
-                                                class="max-w-full max-h-full"
-                                                :style="{ objectFit: element.properties.imageFit || 'contain' }"
+                                                class="absolute"
+                                                :style="{
+                                                    width: '100%',
+                                                    height: '100%',
+                                                    objectFit: 'none',
+                                                    transform: (element.properties as any).cropScale 
+                                                        ? `scale(${(element.properties as any).cropScale}) translate(${((element.properties as any).cropPositionX || 0)}px, ${((element.properties as any).cropPositionY || 0)}px)` 
+                                                        : 'none',
+                                                    top: '0',
+                                                    left: '0'
+                                                }"
                                             />
                                             <div v-else class="flex flex-col items-center justify-center text-gray-500 text-sm text-center p-2">
                                                 <Upload class="h-8 w-8 mb-2" />
@@ -687,6 +797,145 @@ const generateImage = async () => {
                                 </div>
                             </div>
                         </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Image Cropping Modal -->
+    <div
+        v-if="isCroppingModalOpen"
+        class="fixed inset-0 bg-black bg-opacity-75 z-50 flex items-center justify-center p-4"
+        @mouseup="stopImageDrag"
+        @mousemove="onImageDrag"
+    >
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+            <!-- Header -->
+            <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Adjust Image</h3>
+                <button
+                    @click="closeCropModal"
+                    class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+                >
+                    <X class="w-6 h-6" />
+                </button>
+            </div>
+
+             <!-- Preview Area -->
+             <div class="flex-1 overflow-auto p-6 bg-gray-50 dark:bg-gray-900">
+                 <div class="flex items-center justify-center min-h-full">
+                     <div
+                         class="relative"
+                         :style="{
+                             width: cropElement?.width + 'px',
+                             height: cropElement?.height + 'px',
+                         }"
+                     >
+                        <!-- Shape outline with opacity -->
+                        <div
+                            class="absolute inset-0 pointer-events-none border-4 border-dashed border-blue-500"
+                            :style="{
+                                clipPath: getImageClipPath(cropElement?.properties.imageShape || 'rectangle'),
+                                borderRadius: (cropElement?.properties.borderRadius || 0) + 'px'
+                            }"
+                        ></div>
+
+                         <!-- Image preview with drag -->
+                         <div
+                             class="absolute inset-0 overflow-hidden cursor-move"
+                             :style="{
+                                 clipPath: getImageClipPath(cropElement?.properties.imageShape || 'rectangle'),
+                                 borderRadius: (cropElement?.properties.borderRadius || 0) + 'px'
+                             }"
+                             @mousedown="startImageDrag"
+                         >
+                             <img
+                                 :src="cropImageUrl"
+                                 alt="Crop preview"
+                                 class="absolute select-none"
+                                 :style="{
+                                     width: '100%',
+                                     height: '100%',
+                                     objectFit: 'none',
+                                     transform: `scale(${cropScale}) translate(${cropPositionX}px, ${cropPositionY}px)`,
+                                     opacity: cropOpacity,
+                                     pointerEvents: 'none',
+                                     top: '0',
+                                     left: '0'
+                                 }"
+                             />
+                         </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Controls -->
+            <div class="px-6 py-4 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
+                <div class="space-y-4">
+                    <!-- Zoom Controls -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                            Zoom: {{ Math.round(cropScale * 100) }}%
+                        </label>
+                        <div class="flex items-center gap-3">
+                            <button
+                                @click="zoomOut"
+                                class="p-2 rounded-lg border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                                :disabled="cropScale <= 0.5"
+                            >
+                                <Minus class="w-5 h-5" />
+                            </button>
+                            <input
+                                type="range"
+                                v-model.number="cropScale"
+                                min="0.5"
+                                max="3"
+                                step="0.1"
+                                class="flex-1"
+                            />
+                            <button
+                                @click="zoomIn"
+                                class="p-2 rounded-lg border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                                :disabled="cropScale >= 3"
+                            >
+                                <Plus class="w-5 h-5" />
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Opacity Control -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                            Preview Opacity: {{ Math.round(cropOpacity * 100) }}%
+                        </label>
+                        <input
+                            type="range"
+                            v-model.number="cropOpacity"
+                            min="0.1"
+                            max="1"
+                            step="0.1"
+                            class="w-full"
+                        />
+                        <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                            Adjust opacity to see how the image fits in the shape
+                        </p>
+                    </div>
+
+                    <!-- Action Buttons -->
+                    <div class="flex gap-3 pt-2">
+                        <button
+                            @click="closeCropModal"
+                            class="flex-1 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 dark:bg-gray-700 dark:text-gray-300 dark:border-gray-600 dark:hover:bg-gray-600 transition-colors"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            @click="applyCrop"
+                            class="flex-1 px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
+                        >
+                            Apply
+                        </button>
                     </div>
                 </div>
             </div>

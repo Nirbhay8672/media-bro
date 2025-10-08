@@ -184,18 +184,15 @@ const getCheckboxChecked = (event: Event): boolean => {
                         ></textarea>
                     </div>
 
-                    <!-- Image URL (only for image elements) -->
-                    <div v-if="selectedElement.type === 'image'">
-                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                            Image URL
-                        </label>
-                        <input
-                            :value="selectedElement.properties.imageUrl || ''"
-                            @input="updateElementProperty('imageUrl', getInputValue($event))"
-                            type="url"
-                            class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white transition-colors text-sm"
-                            placeholder="Enter image URL"
-                        />
+                    <!-- Remove Image Button (only for image elements with URL) -->
+                    <div v-if="selectedElement.type === 'image' && selectedElement.properties.imageUrl">
+                        <button
+                            @click="updateElementProperty('imageUrl', '')"
+                            type="button"
+                            class="w-full px-3 py-2 text-sm font-medium text-red-600 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 dark:bg-red-900/20 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-900/30 transition-colors"
+                        >
+                            Remove Image
+                        </button>
                     </div>
                 </div>
 
@@ -317,23 +314,6 @@ const getCheckboxChecked = (event: Event): boolean => {
                                 class="w-full px-2 py-1 border border-gray-300 dark:border-gray-600 rounded text-sm focus:ring-1 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
                             >
                                 <option v-for="shape in imageShapes" :key="shape.value" :value="shape.value">{{ shape.name }}</option>
-                            </select>
-                        </div>
-
-                        <!-- Image Fit -->
-                        <div>
-                            <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
-                                Image Fit
-                            </label>
-                            <select
-                                :value="selectedElement.properties.imageFit || 'contain'"
-                                @change="updateElementProperty('imageFit', getInputValue($event))"
-                                class="w-full px-2 py-1 border border-gray-300 dark:border-gray-600 rounded text-sm focus:ring-1 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
-                            >
-                                <option value="contain">Contain</option>
-                                <option value="cover">Cover</option>
-                                <option value="fill">Fill</option>
-                                <option value="scale-down">Scale Down</option>
                             </select>
                         </div>
 

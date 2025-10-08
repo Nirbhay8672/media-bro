@@ -163,7 +163,7 @@ const createElement = (type: CanvasElement['type'], x: number, y: number) => {
             boxShadow: 'none',
             textShadow: 'none',
             imageUrl: type === 'image' ? '' : undefined,
-            imageFit: type === 'image' ? 'contain' : undefined,
+            imageFit: type === 'image' ? 'cover' : undefined,
             backgroundColor: type === 'text' ? 'transparent' : (type === 'image' ? 'transparent' : '#000000'),
             imageShape: type === 'image' ? 'rectangle' : undefined
         }
