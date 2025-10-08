@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Head } from '@inertiajs/vue3';
-import { Download, Type, Image, Upload, X, Plus, Minus, Move } from 'lucide-vue-next';
+import { Download, Type, Image, Upload, X, Plus, Minus } from 'lucide-vue-next';
 import { ref, computed } from 'vue';
 import * as domtoimage from 'dom-to-image';
 import Swal from 'sweetalert2';
@@ -78,6 +78,7 @@ const cropPositionY = ref(0);
 const cropOpacity = ref(1);
 const isDraggingImage = ref(false);
 const dragImageStart = ref({ x: 0, y: 0, posX: 0, posY: 0 });
+const selectedImageElement = ref<CanvasElement | null>(null);
 
 const canvasElements = ref<CanvasElement[]>([]);
 
@@ -166,6 +167,13 @@ const dragStart = ref({ x: 0, y: 0 });
 const draggedElement = ref<CanvasElement | null>(null);
 
 const handleElementMouseDown = (event: MouseEvent, element: CanvasElement) => {
+    selectedElement.value = element;
+    
+    // Hide zoom controls when clicking on other elements
+    if (element.type !== 'image') {
+        selectedImageElement.value = null;
+    }
+    
     if (element.type === 'text') {
         event.preventDefault();
         isDragging.value = true;
@@ -250,35 +258,55 @@ const handleImageUpload = (event: Event, element: CanvasElement) => {
     
     const imageUrl = URL.createObjectURL(file);
     
-    // Open cropping modal
-    cropImageUrl.value = imageUrl;
-    cropElement.value = element;
-    cropScale.value = 0.5;
-    cropPositionX.value = 0;
-    cropPositionY.value = 0;
-    cropOpacity.value = 1;
-    isCroppingModalOpen.value = true;
+    // Set image URL directly
+    element.properties.imageUrl = imageUrl;
+    // Initialize crop settings if not set
+    if (!(element.properties as any).cropScale) {
+        (element.properties as any).cropScale = 1;
+    }
+    if (!(element.properties as any).cropPositionX) {
+        (element.properties as any).cropPositionX = 0;
+    }
+    if (!(element.properties as any).cropPositionY) {
+        (element.properties as any).cropPositionY = 0;
+    }
     
     // Store file for later
     (element as any).uploadedFile = file;
 };
 
 // Crop control functions
-const zoomIn = () => {
-    cropScale.value = Math.min(cropScale.value + 0.1, 3);
+const zoomInImage = (element: CanvasElement) => {
+    const currentScale = (element.properties as any).cropScale || 1;
+    const newScale = Math.min(currentScale + 0.1, 3);
+    (element.properties as any).cropScale = newScale;
 };
 
-const zoomOut = () => {
-    cropScale.value = Math.max(cropScale.value - 0.1, 0.5);
+const zoomOutImage = (element: CanvasElement) => {
+    const currentScale = (element.properties as any).cropScale || 1;
+    const newScale = Math.max(currentScale - 0.1, 0.5);
+    (element.properties as any).cropScale = newScale;
 };
 
-const startImageDrag = (event: MouseEvent) => {
+const updateImageScale = (element: CanvasElement, scale: number) => {
+    (element.properties as any).cropScale = Math.max(0.5, Math.min(3, scale));
+};
+
+const handleImageClick = (event: MouseEvent, element: CanvasElement) => {
+    event.stopPropagation();
+    selectedImageElement.value = element;
+};
+
+const startImageDrag = (event: MouseEvent, element: CanvasElement) => {
+    event.stopPropagation();
     isDraggingImage.value = true;
+    cropElement.value = element;
+    selectedImageElement.value = element;
     dragImageStart.value = {
         x: event.clientX,
         y: event.clientY,
-        posX: cropPositionX.value,
-        posY: cropPositionY.value
+        posX: (element.properties as any).cropPositionX || 0,
+        posY: (element.properties as any).cropPositionY || 0
     };
 };
 
@@ -288,17 +316,18 @@ const onImageDrag = (event: MouseEvent) => {
     const deltaX = event.clientX - dragImageStart.value.x;
     const deltaY = event.clientY - dragImageStart.value.y;
     
-    // Scale the movement based on the crop scale
-    const scaledDeltaX = deltaX / cropScale.value;
-    const scaledDeltaY = deltaY / cropScale.value;
+    const newPosX = dragImageStart.value.posX + deltaX;
+    const newPosY = dragImageStart.value.posY + deltaY;
     
-    cropPositionX.value = dragImageStart.value.posX + scaledDeltaX;
-    cropPositionY.value = dragImageStart.value.posY + scaledDeltaY;
+    // Update the element's crop position
+    (cropElement.value.properties as any).cropPositionX = newPosX;
+    (cropElement.value.properties as any).cropPositionY = newPosY;
 };
 
 const stopImageDrag = () => {
     isDraggingImage.value = false;
 };
+
 
 const applyCrop = () => {
     if (cropElement.value) {
@@ -549,13 +578,13 @@ const generateImage = async () => {
 <template>
     <Head :title="template.name" />
 
-    <div class="min-h-screen bg-gray-50 dark:bg-gray-900">
+    <div class="min-h-screen bg-gray-50 dark:bg-gray-900" @mouseup="stopImageDrag" @mousemove="onImageDrag">
         <!-- Main Content -->
         <div class="mx-auto px-4 py-6 sm:px-6 lg:px-8">
             <div class="grid gap-6 lg:grid-cols-4">
                 <!-- Left Sidebar - Content Upload -->
                 <div class="lg:col-span-1">
-                    <div class="space-y-4">
+                    <div class="space-y-4 max-h-[calc(100vh-2rem)] overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-600">
                         <div v-if="textElements.length > 0" class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
                             <div class="p-4 border-b border-gray-200 dark:border-gray-700">
                                 <h2 class="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
@@ -587,84 +616,118 @@ const generateImage = async () => {
                             <div class="p-4 border-b border-gray-200 dark:border-gray-700">
                                 <h2 class="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
                                     <Image class="h-5 w-5" />
-                                    Image Upload
+                                    Image Upload ({{ imageElements.length }})
                                 </h2>
                             </div>
-                            <div class="p-4 space-y-4">
-                                <div
-                                    v-for="(element, index) in imageElements"
-                                    :key="element.id"
-                                    class="space-y-2"
-                                >
-                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                                        Image {{ index + 1 }}
-                                    </label>
-                                    <div class="space-y-2">
-                                        <!-- File Upload Input -->
-                                        <input
-                                            :id="`image-${element.id}`"
-                                            type="file"
-                                            accept="image/*"
-                                            @change="handleImageUpload($event, element)"
-                                            class="hidden"
-                                        />
-                                        <label
-                                            :for="`image-${element.id}`"
-                                            class="flex flex-col items-center justify-center w-full h-32 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 dark:hover:bg-bray-800 dark:bg-gray-700 hover:bg-gray-100 dark:border-gray-600 dark:hover:border-gray-500 dark:hover:bg-gray-600"
-                                        >
-                                            <div class="flex flex-col items-center justify-center pt-5 pb-6">
-                                                <Upload class="w-8 h-8 mb-4 text-gray-500 dark:text-gray-400" />
-                                                <p class="mb-2 text-sm text-gray-500 dark:text-gray-400">
-                                                    <span class="font-semibold">Click to upload</span> or drag and drop
-                                                </p>
-                                                <p class="text-xs text-gray-500 dark:text-gray-400">PNG, JPG, GIF up to 10MB</p>
-                                            </div>
+                            <div class="p-4">
+                                <!-- Grid layout for multiple images -->
+                                <div class="grid gap-3" :class="imageElements.length > 3 ? 'grid-cols-2' : 'grid-cols-1'">
+                                    <div
+                                        v-for="(element, index) in imageElements"
+                                        :key="element.id"
+                                        class="space-y-2"
+                                    >
+                                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                                            Image {{ index + 1 }}
                                         </label>
-
-                                        <!-- Image Preview -->
-                                        <div v-if="element.properties.imageUrl" class="mt-2">
-                                            <img
-                                                :src="element.properties.imageUrl"
-                                                :alt="`Image ${index + 1}`"
-                                                class="w-full h-24 object-cover rounded-lg border border-gray-300 dark:border-gray-600"
+                                        <div class="space-y-2">
+                                            <!-- File Upload Input -->
+                                            <input
+                                                :id="`image-${element.id}`"
+                                                type="file"
+                                                accept="image/*"
+                                                @change="handleImageUpload($event, element)"
+                                                class="hidden"
                                             />
-                                            <button
-                                                type="button"
-                                                @click="removeImage(element)"
-                                                class="mt-1 text-xs text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300"
-                                            >
-                                                Remove image
-                                            </button>
+                                            
+                                            <!-- Upload Area or Preview -->
+                                            <div v-if="!element.properties.imageUrl">
+                                                <label
+                                                    :for="`image-${element.id}`"
+                                                    class="flex flex-col items-center justify-center w-full h-20 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 dark:hover:bg-bray-800 dark:bg-gray-700 hover:bg-gray-100 dark:border-gray-600 dark:hover:border-gray-500 dark:hover:bg-gray-600"
+                                                >
+                                                    <div class="flex flex-col items-center justify-center py-3">
+                                                        <Upload class="w-5 h-5 mb-1 text-gray-500 dark:text-gray-400" />
+                                                        <p class="text-xs text-gray-500 dark:text-gray-400">
+                                                            <span class="font-semibold">Upload</span>
+                                                        </p>
+                                                    </div>
+                                                </label>
+                                            </div>
+
+                                            <!-- Image Preview -->
+                                            <div v-else class="relative group">
+                                                <img
+                                                    :src="element.properties.imageUrl"
+                                                    :alt="`Image ${index + 1}`"
+                                                    class="w-full h-20 object-cover rounded-lg border border-gray-300 dark:border-gray-600"
+                                                />
+                                                <button
+                                                    type="button"
+                                                    @click="removeImage(element)"
+                                                    class="absolute -top-2 -right-2 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center text-xs hover:bg-red-600 transition-colors opacity-0 group-hover:opacity-100"
+                                                >
+                                                    <X class="w-3 h-3" />
+                                                </button>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
                             </div>
                         </div>
 
-                        <!-- No Content Message -->
-                        <div v-if="textElements.length === 0 && imageElements.length === 0" class="bg-yellow-50 dark:bg-yellow-900/20 rounded-xl border border-yellow-200 dark:border-yellow-800">
-                            <div class="p-4">
-                                <h3 class="text-sm font-medium text-yellow-900 dark:text-yellow-100 mb-2">
-                                    No content fields found
-                                </h3>
-                                <p class="text-xs text-yellow-800 dark:text-yellow-200">
-                                    This template doesn't have any text or image placeholders yet. The template creator needs to add content fields first.
-                                </p>
+                        <!-- Image Controls -->
+                        <div v-if="selectedImageElement && selectedImageElement.properties.imageUrl" class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
+                            <div class="p-4 border-b border-gray-200 dark:border-gray-700">
+                                <h2 class="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                                    <Image class="h-5 w-5" />
+                                    Image Controls
+                                </h2>
                             </div>
-                        </div>
+                            <div class="p-4 space-y-4">
+                                <!-- Zoom Controls -->
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                        Zoom: {{ Math.round(((selectedImageElement.properties as any).cropScale || 1) * 100) }}%
+                                    </label>
+                                    <div class="flex items-center gap-3">
+                                        <button
+                                            @click="zoomOutImage(selectedImageElement)"
+                                            class="p-2 rounded-lg border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                                            :disabled="((selectedImageElement.properties as any).cropScale || 1) <= 0.5"
+                                        >
+                                            <Minus class="w-4 h-4" />
+                                        </button>
+                                        <div class="flex-1">
+                                            <input
+                                                type="range"
+                                                :value="(selectedImageElement.properties as any).cropScale || 1"
+                                                @input="(event) => updateImageScale(selectedImageElement, parseFloat((event.target as HTMLInputElement).value))"
+                                                min="0.5"
+                                                max="3"
+                                                step="0.1"
+                                                class="w-full"
+                                            />
+                                        </div>
+                                        <button
+                                            @click="zoomInImage(selectedImageElement)"
+                                            class="p-2 rounded-lg border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                                            :disabled="((selectedImageElement.properties as any).cropScale || 1) >= 3"
+                                        >
+                                            <Plus class="w-4 h-4" />
+                                        </button>
+                                    </div>
+                                </div>
 
-                        <!-- Instructions -->
-                        <div class="bg-blue-50 dark:bg-blue-900/20 rounded-xl border border-blue-200 dark:border-blue-800">
-                            <div class="p-4">
-                                <h3 class="text-sm font-medium text-blue-900 dark:text-blue-100 mb-2">
-                                    How to use this template:
-                                </h3>
-                                <ul class="text-xs text-blue-800 dark:text-blue-200 space-y-1">
-                                    <li>• Fill in the text fields with your content</li>
-                                    <li>• Upload images by clicking the upload areas</li>
-                                    <li>• Click "Download Image" to generate your final image</li>
-                                    <li>• All positioning and styling is already set by the template creator</li>
-                                </ul>
+                                <!-- Instructions -->
+                                <div class="text-xs text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-700 p-3 rounded-lg">
+                                    <p class="font-medium mb-1">How to use:</p>
+                                    <ul class="space-y-1">
+                                        <li>• Click and drag the image to position it</li>
+                                        <li>• Use zoom controls to adjust the size</li>
+                                        <li>• The image will be cropped to the shape</li>
+                                    </ul>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -732,34 +795,35 @@ const generateImage = async () => {
                                         </div>
 
                                         <!-- Image Element -->
-                                        <div v-else-if="element.type === 'image'" class="w-full h-full flex items-center justify-center overflow-hidden relative" :style="{
+                                        <div v-else-if="element.type === 'image'" class="w-full h-full flex items-center justify-center overflow-hidden relative group" :style="{
                                             backgroundColor: element.properties.backgroundColor || 'transparent',
                                             border: element.properties.hasBorder ? `${element.properties.strokeWidth}px ${element.properties.borderStyle} ${element.properties.strokeColor}` : 'none',
-                                            borderRadius: element.properties.borderRadius + 'px',
+                                            borderRadius: (element.properties.imageShape === 'rectangle' ? (element.properties.borderRadius || 0) + 'px' : '0px'),
                                             clipPath: getImageClipPath(element.properties.imageShape || 'rectangle')
-                                        }" @click="console.log('Image element properties:', {
-                                            imageShape: element.properties.imageShape,
-                                            cropScale: (element.properties as any).cropScale,
-                                            cropPositionX: (element.properties as any).cropPositionX,
-                                            cropPositionY: (element.properties as any).cropPositionY,
-                                            imageUrl: element.properties.imageUrl
-                                        })">
+                                        }" @mousedown="handleElementMouseDown($event, element)">
                                             <img
                                                 v-if="element.properties.imageUrl"
                                                 :src="element.properties.imageUrl"
                                                 :alt="element.properties.imagePlaceholder"
-                                                class="absolute"
+                                                class="absolute cursor-move select-none"
                                                 :style="{
-                                                    width: '100%',
-                                                    height: '100%',
+                                                    width: 'auto',
+                                                    height: 'auto',
+                                                    maxWidth: 'none',
+                                                    maxHeight: 'none',
                                                     objectFit: 'none',
                                                     transform: (element.properties as any).cropScale 
-                                                        ? `scale(${(element.properties as any).cropScale}) translate(${((element.properties as any).cropPositionX || 0)}px, ${((element.properties as any).cropPositionY || 0)}px)` 
-                                                        : 'none',
-                                                    top: '0',
-                                                    left: '0'
+                                                        ? `translate(-50%, -50%) scale(${(element.properties as any).cropScale}) translate(${((element.properties as any).cropPositionX || 0)}px, ${((element.properties as any).cropPositionY || 0)}px)` 
+                                                        : 'translate(-50%, -50%)',
+                                                    top: '50%',
+                                                    left: '50%',
+                                                    transformOrigin: 'center'
                                                 }"
+                                                @click="(event) => handleImageClick(event, element)"
+                                                @mousedown="(event) => startImageDrag(event, element)"
                                             />
+                                            
+                                            
                                             <div v-else class="flex flex-col items-center justify-center text-gray-500 text-sm text-center p-2">
                                                 <Upload class="h-8 w-8 mb-2" />
                                                 <span>{{ element.properties.imagePlaceholder }}</span>
@@ -803,142 +867,4 @@ const generateImage = async () => {
         </div>
     </div>
 
-    <!-- Image Cropping Modal -->
-    <div
-        v-if="isCroppingModalOpen"
-        class="fixed inset-0 bg-black bg-opacity-75 z-50 flex items-center justify-center p-4"
-        @mouseup="stopImageDrag"
-        @mousemove="onImageDrag"
-    >
-        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
-            <!-- Header -->
-            <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
-                <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Adjust Image</h3>
-                <button
-                    @click="closeCropModal"
-                    class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
-                >
-                    <X class="w-6 h-6" />
-                </button>
-            </div>
-
-             <!-- Preview Area -->
-             <div class="flex-1 overflow-auto p-6 bg-gray-50 dark:bg-gray-900">
-                 <div class="flex items-center justify-center min-h-full">
-                     <div
-                         class="relative"
-                         :style="{
-                             width: cropElement?.width + 'px',
-                             height: cropElement?.height + 'px',
-                         }"
-                     >
-                        <!-- Shape outline with opacity -->
-                        <div
-                            class="absolute inset-0 pointer-events-none border-4 border-dashed border-blue-500"
-                            :style="{
-                                clipPath: getImageClipPath(cropElement?.properties.imageShape || 'rectangle'),
-                                borderRadius: (cropElement?.properties.borderRadius || 0) + 'px'
-                            }"
-                        ></div>
-
-                         <!-- Image preview with drag -->
-                         <div
-                             class="absolute inset-0 overflow-hidden cursor-move"
-                             :style="{
-                                 clipPath: getImageClipPath(cropElement?.properties.imageShape || 'rectangle'),
-                                 borderRadius: (cropElement?.properties.borderRadius || 0) + 'px'
-                             }"
-                             @mousedown="startImageDrag"
-                         >
-                             <img
-                                 :src="cropImageUrl"
-                                 alt="Crop preview"
-                                 class="absolute select-none"
-                                 :style="{
-                                     width: '100%',
-                                     height: '100%',
-                                     objectFit: 'none',
-                                     transform: `scale(${cropScale}) translate(${cropPositionX}px, ${cropPositionY}px)`,
-                                     opacity: cropOpacity,
-                                     pointerEvents: 'none',
-                                     top: '0',
-                                     left: '0'
-                                 }"
-                             />
-                         </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Controls -->
-            <div class="px-6 py-4 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
-                <div class="space-y-4">
-                    <!-- Zoom Controls -->
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                            Zoom: {{ Math.round(cropScale * 100) }}%
-                        </label>
-                        <div class="flex items-center gap-3">
-                            <button
-                                @click="zoomOut"
-                                class="p-2 rounded-lg border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-                                :disabled="cropScale <= 0.5"
-                            >
-                                <Minus class="w-5 h-5" />
-                            </button>
-                            <input
-                                type="range"
-                                v-model.number="cropScale"
-                                min="0.5"
-                                max="3"
-                                step="0.1"
-                                class="flex-1"
-                            />
-                            <button
-                                @click="zoomIn"
-                                class="p-2 rounded-lg border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-                                :disabled="cropScale >= 3"
-                            >
-                                <Plus class="w-5 h-5" />
-                            </button>
-                        </div>
-                    </div>
-
-                    <!-- Opacity Control -->
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                            Preview Opacity: {{ Math.round(cropOpacity * 100) }}%
-                        </label>
-                        <input
-                            type="range"
-                            v-model.number="cropOpacity"
-                            min="0.1"
-                            max="1"
-                            step="0.1"
-                            class="w-full"
-                        />
-                        <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                            Adjust opacity to see how the image fits in the shape
-                        </p>
-                    </div>
-
-                    <!-- Action Buttons -->
-                    <div class="flex gap-3 pt-2">
-                        <button
-                            @click="closeCropModal"
-                            class="flex-1 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 dark:bg-gray-700 dark:text-gray-300 dark:border-gray-600 dark:hover:bg-gray-600 transition-colors"
-                        >
-                            Cancel
-                        </button>
-                        <button
-                            @click="applyCrop"
-                            class="flex-1 px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
-                        >
-                            Apply
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
 </template>
