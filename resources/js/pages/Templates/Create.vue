@@ -54,8 +54,12 @@ const form = ref({
 });
 
 const backgroundImagePreview = ref<string | null>(null);
+const originalImageDimensions = ref({ width: 0, height: 0 });
 
 onMounted(() => {
+    // Set default template to Original Size
+    selectedQuickTemplate.value = { name: 'Original Size', width: 0, height: 0 };
+    
     if (isEditMode.value && props.template) {
         form.value.name = props.template.name;
         form.value.width = props.template.width;
@@ -73,9 +77,55 @@ onMounted(() => {
         
         if (props.template.background_image) {
             backgroundImagePreview.value = `/storage/${props.template.background_image}`;
+            
+            // Load the background image to get its original dimensions
+            const img = new Image();
+            img.onload = () => {
+                originalImageDimensions.value = {
+                    width: img.naturalWidth,
+                    height: img.naturalHeight
+                };
+                // Set selected template to Original Size with detected dimensions
+                selectedQuickTemplate.value = { 
+                    name: 'Original Size', 
+                    width: img.naturalWidth, 
+                    height: img.naturalHeight 
+                };
+            };
+            img.src = backgroundImagePreview.value;
+        } else {
+            // No background image - try to match with predefined templates
+            const matchingTemplate = findMatchingTemplate(props.template?.width || 800, props.template?.height || 600);
+            selectedQuickTemplate.value = matchingTemplate;
         }
     }
 });
+
+// Function to find matching template based on dimensions
+const findMatchingTemplate = (width: number, height: number) => {
+    const quickTemplates = [
+        { name: 'Instagram Post', width: 1080, height: 1080 },
+        { name: 'Instagram Story', width: 1080, height: 1920 },
+        { name: 'Facebook Post', width: 1200, height: 630 },
+        { name: 'Twitter Post', width: 1200, height: 675 },
+        { name: 'LinkedIn Post', width: 1200, height: 627 },
+        { name: 'YouTube Thumbnail', width: 1280, height: 720 },
+        { name: 'Pinterest Pin', width: 1000, height: 1500 },
+        { name: 'TikTok Video', width: 1080, height: 1920 },
+    ];
+    
+    // Find exact match
+    const exactMatch = quickTemplates.find(template => 
+        template.width === width && template.height === height
+    );
+    
+    if (exactMatch) {
+        return exactMatch;
+    }
+    
+    // If no exact match, return Custom Size
+    return { name: 'Custom Size', width: width, height: height };
+};
 
 const selectedTool = ref('select');
 const selectedElement = ref<CanvasElement | null>(null);
@@ -315,23 +365,104 @@ const handleResizeElement = (elementId: string, width: number, height: number, x
 
 const applyQuickTemplate = (template: { name: string; width: number; height: number }) => {
     selectedQuickTemplate.value = template;
-    if (template.name !== 'Custom') {
+    if (template.name !== 'Custom' && template.name !== 'Original Size') {
         form.value.width = template.width;
         form.value.height = template.height;
+    } else if (template.name === 'Original Size') {
+        // Use the stored original dimensions if available
+        if (originalImageDimensions.value.width > 0) {
+            form.value.width = originalImageDimensions.value.width;
+            form.value.height = originalImageDimensions.value.height;
+        } else {
+            // Fallback to provided dimensions if no original image
+            form.value.width = template.width;
+            form.value.height = template.height;
+        }
     }
     isQuickTemplateDropdownOpen.value = false;
 };
 
 const handleBackgroundImageChange = (file: File) => {
     console.log('Background image file selected:', file);
+    console.log('File type:', file.type);
+    console.log('File size:', file.size);
+    console.log('File name:', file.name);
+    
+    // Validate file type
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
+    if (!allowedTypes.includes(file.type)) {
+        console.error('Invalid file type:', file.type);
+        Swal.fire({
+            title: 'Invalid File Type',
+            text: `Please select a valid image file. Detected type: ${file.type}. Supported types: JPEG, PNG, GIF, WebP`,
+            icon: 'error',
+            confirmButtonText: 'OK'
+        });
+        return;
+    }
+    
+    // Validate file size (10MB max)
+    const maxSize = 10 * 1024 * 1024; // 10MB
+    if (file.size > maxSize) {
+        Swal.fire({
+            title: 'File Too Large',
+            text: 'Please select an image smaller than 10MB',
+            icon: 'error',
+            confirmButtonText: 'OK'
+        });
+        return;
+    }
+    
     form.value.background_image = file;
     
-    // Create preview URL
+    // Create preview URL and get dimensions
     const reader = new FileReader();
     reader.onload = (e) => {
         const result = e.target?.result as string;
         console.log('Background image preview created:', result ? 'Yes' : 'No');
         backgroundImagePreview.value = result;
+        
+        // Get original image dimensions and update canvas size
+        const img = new Image();
+        img.onload = () => {
+            console.log('Image loaded, dimensions:', img.naturalWidth, 'x', img.naturalHeight);
+            
+            // Store original dimensions
+            originalImageDimensions.value = {
+                width: img.naturalWidth,
+                height: img.naturalHeight
+            };
+            
+            // Update canvas size to match original image
+            form.value.width = img.naturalWidth;
+            form.value.height = img.naturalHeight;
+            
+            // Update selected template to Original Size
+            selectedQuickTemplate.value = { 
+                name: 'Original Size', 
+                width: img.naturalWidth, 
+                height: img.naturalHeight 
+            };
+        };
+        img.onerror = () => {
+            console.error('Failed to load image');
+            Swal.fire({
+                title: 'Invalid Image',
+                text: 'The selected file is not a valid image',
+                icon: 'error',
+                confirmButtonText: 'OK'
+            });
+        };
+        img.src = result;
+    };
+    reader.onerror = () => {
+        console.error('Failed to read file');
+        Swal.fire({
+            title: 'File Read Error',
+            text: 'Failed to read the selected file',
+            icon: 'error',
+            confirmButtonText: 'OK'
+        });
     };
     reader.readAsDataURL(file);
 };
@@ -465,6 +596,7 @@ const handleKeydown = (event: KeyboardEvent) => {
                             v-model:backgroundImagePreview="backgroundImagePreview"
                             v-model:selectedQuickTemplate="selectedQuickTemplate"
                             v-model:isQuickTemplateDropdownOpen="isQuickTemplateDropdownOpen"
+                            :originalImageDimensions="originalImageDimensions"
                             :is-edit-mode="isEditMode"
                             :is-submitting="isSubmitting"
                             @backgroundImageChange="handleBackgroundImageChange"

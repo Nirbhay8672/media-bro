@@ -12,6 +12,7 @@ interface Props {
     backgroundImagePreview: string | null;
     selectedQuickTemplate: { name: string; width: number; height: number } | null;
     isQuickTemplateDropdownOpen: boolean;
+    originalImageDimensions: { width: number; height: number };
     isEditMode?: boolean;
     isSubmitting?: boolean;
 }
@@ -30,8 +31,9 @@ const emit = defineEmits<Emits>();
 
 // Removed search functionality for simplified dropdown
 
-// Quick templates - simplified to 4 essential options
+// Quick templates - including Original Size option
 const quickTemplates = [
+    { name: 'Original Size', width: 0, height: 0 },
     { name: 'Instagram Post', width: 1080, height: 1080 },
     { name: 'Instagram Story', width: 1080, height: 1920 },
     { name: 'Facebook Post', width: 1200, height: 630 },
@@ -124,7 +126,10 @@ const handleKeydown = (event: KeyboardEvent) => {
                                 <span class="flex items-center">
                                     {{ selectedQuickTemplate ? selectedQuickTemplate.name : 'Select a template...' }}
                                     <span v-if="selectedQuickTemplate" class="text-xs text-gray-500 dark:text-gray-400 ml-2">
-                                        ({{ selectedQuickTemplate.width }} × {{ selectedQuickTemplate.height }}px)
+                                        ({{ selectedQuickTemplate.name === 'Original Size' && originalImageDimensions.width > 0 
+                                            ? `${originalImageDimensions.width} × ${originalImageDimensions.height}px`
+                                            : `${selectedQuickTemplate.width} × ${selectedQuickTemplate.height}px`
+                                        }})
                                     </span>
                                 </span>
                                 <ChevronDown class="h-4 w-4 text-gray-400" />
@@ -142,7 +147,12 @@ const handleKeydown = (event: KeyboardEvent) => {
                                 >
                                     <div class="font-medium">{{ template.name }}</div>
                                     <div class="text-xs text-gray-500 dark:text-gray-400">
-                                        {{ template.width }} × {{ template.height }}px
+                                        {{ template.name === 'Original Size' && originalImageDimensions.width > 0 
+                                            ? `${originalImageDimensions.width} × ${originalImageDimensions.height}px`
+                                            : template.name === 'Original Size' 
+                                                ? 'No image uploaded'
+                                                : `${template.width} × ${template.height}px`
+                                        }}
                                     </div>
                                 </button>
                             </div>
