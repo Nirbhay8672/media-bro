@@ -191,6 +191,8 @@ const isResizing = ref(false);
 const resizeHandle = ref('');
 const resizeStart = ref({ x: 0, y: 0, width: 0, height: 0, fontSize: 0 });
 const isAutoCreating = ref(false);
+const cachedScale = ref(1);
+let mouseMoveThrottle: number | null = null;
 
 const isQuickTemplateDropdownOpen = ref(false);
 const selectedQuickTemplate = ref<{ name: string; width: number; height: number } | null>(null);
@@ -324,21 +326,21 @@ const handleCanvasClick = (event: MouseEvent) => {
     }
 };
 
-// Calculate canvas scale factor - now uses the responsive system from CanvasEditor
+// Calculate canvas scale factor - optimized for better performance
 const getCanvasScale = () => {
-    // Get the actual canvas element from CanvasEditor
+    // Calculate responsive scale without DOM queries for better performance
+    const maxWidth = window.innerWidth < 1024 ? 400 : 600;
+    const maxHeight = window.innerWidth < 1024 ? 300 : 450;
+    const scaleX = maxWidth / form.value.width;
+    const scaleY = maxHeight / form.value.height;
+    const responsiveScale = Math.min(scaleX, scaleY, 1);
+    
+    // Get the actual canvas element only when needed
     const canvasElement = document.querySelector('.template-preview-container');
     if (canvasElement) {
         const canvasRect = canvasElement.getBoundingClientRect();
         
-        // Calculate responsive scale
-        const maxWidth = window.innerWidth < 1024 ? 400 : 600;
-        const maxHeight = window.innerWidth < 1024 ? 300 : 450;
-        const scaleX = maxWidth / form.value.width;
-        const scaleY = maxHeight / form.value.height;
-        const responsiveScale = Math.min(scaleX, scaleY, 1);
-        
-        // Get the actual displayed scale (responsive scale * zoom scale)
+        // Get the actual displayed scale
         const displayedWidth = form.value.width * responsiveScale;
         const displayedHeight = form.value.height * responsiveScale;
         const actualScaleX = canvasRect.width / displayedWidth;
@@ -346,7 +348,7 @@ const getCanvasScale = () => {
         
         return Math.min(actualScaleX, actualScaleY, 1) * responsiveScale;
     }
-    return 1;
+    return responsiveScale;
 };
 
 const handleElementMouseDown = (event: MouseEvent, element: CanvasElement) => {
@@ -354,10 +356,11 @@ const handleElementMouseDown = (event: MouseEvent, element: CanvasElement) => {
         event.preventDefault();
         isDragging.value = true;
         
-        const scale = getCanvasScale();
+        // Cache the scale to avoid recalculating during drag
+        cachedScale.value = getCanvasScale();
         dragStart.value = {
-            x: event.clientX - (element.x * scale),
-            y: event.clientY - (element.y * scale)
+            x: event.clientX - (element.x * cachedScale.value),
+            y: event.clientY - (element.y * cachedScale.value)
         };
         selectedElement.value = element;
     }
@@ -365,14 +368,28 @@ const handleElementMouseDown = (event: MouseEvent, element: CanvasElement) => {
 
 const handleMouseMove = (event: MouseEvent) => {
     if (isDragging.value && selectedElement.value) {
-        const scale = getCanvasScale();
-        selectedElement.value.x = (event.clientX - dragStart.value.x) / scale;
-        selectedElement.value.y = (event.clientY - dragStart.value.y) / scale;
+        // Throttle mouse move events for better performance on large canvases
+        if (mouseMoveThrottle) {
+            cancelAnimationFrame(mouseMoveThrottle);
+        }
+        
+        mouseMoveThrottle = requestAnimationFrame(() => {
+            // Use cached scale for better performance during drag
+            if (selectedElement.value) {
+                selectedElement.value.x = (event.clientX - dragStart.value.x) / cachedScale.value;
+                selectedElement.value.y = (event.clientY - dragStart.value.y) / cachedScale.value;
+            }
+        });
     }
 };
 
 const handleMouseUp = (event: MouseEvent) => {
     isDragging.value = false;
+    // Clean up throttle
+    if (mouseMoveThrottle) {
+        cancelAnimationFrame(mouseMoveThrottle);
+        mouseMoveThrottle = null;
+    }
 };
 
 const bringToFront = (elementId: string) => {
