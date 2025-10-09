@@ -12,6 +12,7 @@ interface Props {
     backgroundImagePreview: string | null;
     selectedQuickTemplate: { name: string; width: number; height: number } | null;
     isQuickTemplateDropdownOpen: boolean;
+    originalImageDimensions: { width: number; height: number };
     isEditMode?: boolean;
     isSubmitting?: boolean;
 }
@@ -30,13 +31,16 @@ const emit = defineEmits<Emits>();
 
 // Removed search functionality for simplified dropdown
 
-// Quick templates - simplified to 4 essential options
+// Quick templates - with Original Size as default
 const quickTemplates = [
+    { name: 'Original Size', width: 0, height: 0 }, // Special case for original size
     { name: 'Instagram Post', width: 1080, height: 1080 },
     { name: 'Instagram Story', width: 1080, height: 1920 },
     { name: 'Facebook Post', width: 1200, height: 630 },
     { name: 'Custom Size', width: 800, height: 600 }
 ];
+
+// Original dimensions are now passed as props from parent
 
 // No need for filtering or grouping with only 4 options
 
@@ -58,7 +62,15 @@ const handleBackgroundImageChange = (event: Event) => {
     if (file) {
         const reader = new FileReader();
         reader.onload = (e) => {
-            emit('update:backgroundImagePreview', e.target?.result as string);
+            const result = e.target?.result as string;
+            emit('update:backgroundImagePreview', result);
+            
+            // Get original image dimensions for display purposes
+            const img = new Image();
+            img.onload = () => {
+                originalDimensions.value = { width: img.naturalWidth, height: img.naturalHeight };
+            };
+            img.src = result;
         };
         reader.readAsDataURL(file);
         emit('backgroundImageChange', file);
@@ -66,7 +78,27 @@ const handleBackgroundImageChange = (event: Event) => {
 };
 
 const applyQuickTemplate = (template: { name: string; width: number; height: number }) => {
-    emit('applyQuickTemplate', template);
+    // Handle Original Size case
+    if (template.name === 'Original Size' && props.originalImageDimensions.width > 0) {
+        emit('applyQuickTemplate', { 
+            name: 'Original Size', 
+            width: props.originalImageDimensions.width, 
+            height: props.originalImageDimensions.height 
+        });
+    } else {
+        emit('applyQuickTemplate', template);
+    }
+};
+
+// Function to revert to original size
+const revertToOriginalSize = () => {
+    if (props.originalImageDimensions.width > 0) {
+        emit('applyQuickTemplate', { 
+            name: 'Original Size', 
+            width: props.originalImageDimensions.width, 
+            height: props.originalImageDimensions.height 
+        });
+    }
 };
 
 const toggleQuickTemplateDropdown = () => {
@@ -96,7 +128,7 @@ const handleKeydown = (event: KeyboardEvent) => {
             <div class="p-4">
                 <div class="flex flex-wrap items-end gap-4">
                     <!-- Template Name -->
-                    <div class="flex-1 min-w-[200px]">
+                    <div class="flex-1 min-w-[150px]">
                         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                             Template Name *
                         </label>
@@ -124,7 +156,12 @@ const handleKeydown = (event: KeyboardEvent) => {
                                 <span class="flex items-center">
                                     {{ selectedQuickTemplate ? selectedQuickTemplate.name : 'Select a template...' }}
                                     <span v-if="selectedQuickTemplate" class="text-xs text-gray-500 dark:text-gray-400 ml-2">
-                                        ({{ selectedQuickTemplate.width }} × {{ selectedQuickTemplate.height }}px)
+                                        <template v-if="selectedQuickTemplate.name === 'Original Size' && originalImageDimensions.width > 0">
+                                            ({{ originalImageDimensions.width }} × {{ originalImageDimensions.height }}px)
+                                        </template>
+                                        <template v-else>
+                                            ({{ selectedQuickTemplate.width }} × {{ selectedQuickTemplate.height }}px)
+                                        </template>
                                     </span>
                                 </span>
                                 <ChevronDown class="h-4 w-4 text-gray-400" />
@@ -142,7 +179,15 @@ const handleKeydown = (event: KeyboardEvent) => {
                                 >
                                     <div class="font-medium">{{ template.name }}</div>
                                     <div class="text-xs text-gray-500 dark:text-gray-400">
-                                        {{ template.width }} × {{ template.height }}px
+                                        <template v-if="template.name === 'Original Size' && originalImageDimensions.width > 0">
+                                            {{ originalImageDimensions.width }} × {{ originalImageDimensions.height }}px
+                                        </template>
+                                        <template v-else-if="template.name === 'Original Size'">
+                                            No background image
+                                        </template>
+                                        <template v-else>
+                                            {{ template.width }} × {{ template.height }}px
+                                        </template>
                                     </div>
                                 </button>
                             </div>
@@ -178,6 +223,19 @@ const handleKeydown = (event: KeyboardEvent) => {
                                 step="1"
                                 class="w-20 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white transition-colors text-sm"
                             />
+                        </div>
+                        <div v-if="originalImageDimensions.width > 0">
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                &nbsp;
+                            </label>
+                            <button
+                                type="button"
+                                @click="revertToOriginalSize"
+                                class="px-3 py-2 text-xs font-medium text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors"
+                                title="Revert to original background size"
+                            >
+                                Original
+                            </button>
                         </div>
                     </div>
 
