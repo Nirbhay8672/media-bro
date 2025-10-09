@@ -106,6 +106,7 @@ class TemplateController extends Controller
             'width' => 'required|integer|min:100|max:4000',
             'height' => 'required|integer|min:100|max:4000',
             'background_image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:10240',
+            'quick_template' => 'nullable|string|max:255',
         ]);
 
         if ($isUpdate) {
@@ -134,6 +135,7 @@ class TemplateController extends Controller
         $template->description = $request->description;
         $template->width = $request->width;
         $template->height = $request->height;
+        $template->quick_template = $request->quick_template ?? 'Original Size';
         
         // Parse canvas_data if it's a JSON string
         $canvasData = $request->canvas_data ?? [];

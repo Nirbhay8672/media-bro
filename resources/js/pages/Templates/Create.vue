@@ -22,6 +22,7 @@ const props = defineProps<{
         canvas_data: any[] | string;
         share_token: string;
         is_active: boolean;
+        quick_template?: string;
         created_at: string;
         updated_at: string;
     };
@@ -51,6 +52,7 @@ const form = ref({
     height: 600,
     background_image: null as File | null,
     canvas_data: [] as any[],
+    quick_template: 'Original Size',
 });
 
 const backgroundImagePreview = ref<string | null>(null);
@@ -64,6 +66,7 @@ onMounted(() => {
         form.value.name = props.template.name;
         form.value.width = props.template.width;
         form.value.height = props.template.height;
+        form.value.quick_template = props.template.quick_template || 'Original Size';
         
         let canvasData = props.template.canvas_data;
         if (typeof canvasData === 'string') {
@@ -85,18 +88,70 @@ onMounted(() => {
                     width: img.naturalWidth,
                     height: img.naturalHeight
                 };
-                // Set selected template to Original Size with detected dimensions
-                selectedQuickTemplate.value = { 
-                    name: 'Original Size', 
-                    width: img.naturalWidth, 
-                    height: img.naturalHeight 
-                };
+                
+                // Use stored quick template or default to Original Size
+                const storedTemplate = form.value.quick_template;
+                if (storedTemplate === 'Original Size') {
+                    selectedQuickTemplate.value = { 
+                        name: 'Original Size', 
+                        width: img.naturalWidth, 
+                        height: img.naturalHeight 
+                    };
+                } else {
+                    // Find the stored template in predefined templates
+                    const quickTemplates = [
+                        { name: 'Instagram Post', width: 1080, height: 1080 },
+                        { name: 'Instagram Story', width: 1080, height: 1920 },
+                        { name: 'Facebook Post', width: 1200, height: 630 },
+                        { name: 'Twitter Post', width: 1200, height: 675 },
+                        { name: 'LinkedIn Post', width: 1200, height: 627 },
+                        { name: 'YouTube Thumbnail', width: 1280, height: 720 },
+                        { name: 'Pinterest Pin', width: 1000, height: 1500 },
+                        { name: 'TikTok Video', width: 1080, height: 1920 },
+                        { name: 'Custom Size', width: 800, height: 600 }
+                    ];
+                    
+                    const foundTemplate = quickTemplates.find(t => t.name === storedTemplate);
+                    if (foundTemplate) {
+                        selectedQuickTemplate.value = foundTemplate;
+                    } else {
+                        // Fallback to Original Size if stored template not found
+                        selectedQuickTemplate.value = { 
+                            name: 'Original Size', 
+                            width: img.naturalWidth, 
+                            height: img.naturalHeight 
+                        };
+                    }
+                }
             };
             img.src = backgroundImagePreview.value;
         } else {
-            // No background image - try to match with predefined templates
-            const matchingTemplate = findMatchingTemplate(props.template?.width || 800, props.template?.height || 600);
-            selectedQuickTemplate.value = matchingTemplate;
+            // No background image - use stored quick template or try to match with predefined templates
+            const storedTemplate = form.value.quick_template;
+            if (storedTemplate && storedTemplate !== 'Original Size') {
+                const quickTemplates = [
+                    { name: 'Instagram Post', width: 1080, height: 1080 },
+                    { name: 'Instagram Story', width: 1080, height: 1920 },
+                    { name: 'Facebook Post', width: 1200, height: 630 },
+                    { name: 'Twitter Post', width: 1200, height: 675 },
+                    { name: 'LinkedIn Post', width: 1200, height: 627 },
+                    { name: 'YouTube Thumbnail', width: 1280, height: 720 },
+                    { name: 'Pinterest Pin', width: 1000, height: 1500 },
+                    { name: 'TikTok Video', width: 1080, height: 1920 },
+                    { name: 'Custom Size', width: 800, height: 600 }
+                ];
+                
+                const foundTemplate = quickTemplates.find(t => t.name === storedTemplate);
+                if (foundTemplate) {
+                    selectedQuickTemplate.value = foundTemplate;
+                } else {
+                    const matchingTemplate = findMatchingTemplate(props.template?.width || 800, props.template?.height || 600);
+                    selectedQuickTemplate.value = matchingTemplate;
+                }
+            } else {
+                const matchingTemplate = findMatchingTemplate(props.template?.width || 800, props.template?.height || 600);
+                selectedQuickTemplate.value = matchingTemplate;
+            }
         }
     }
 });
@@ -365,6 +420,10 @@ const handleResizeElement = (elementId: string, width: number, height: number, x
 
 const applyQuickTemplate = (template: { name: string; width: number; height: number }) => {
     selectedQuickTemplate.value = template;
+    
+    // Store the selected template name in the form
+    form.value.quick_template = template.name;
+    
     if (template.name !== 'Custom' && template.name !== 'Original Size') {
         form.value.width = template.width;
         form.value.height = template.height;
@@ -497,6 +556,7 @@ const submitForm = async () => {
         formDataObj.append('width', form.value.width.toString());
         formDataObj.append('height', form.value.height.toString());
         formDataObj.append('canvas_data', JSON.stringify(canvasElements.value));
+        formDataObj.append('quick_template', form.value.quick_template);
         
         if (form.value.background_image) {
             formDataObj.append('background_image', form.value.background_image);
