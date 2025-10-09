@@ -334,15 +334,15 @@ const getImageClipPath = (shape: string) => {
                 </div>
             </div>
 
-            <div class="p-2 sm:p-4 flex justify-center items-start min-h-[300px] sm:min-h-[400px]">
-                <div class="relative w-full max-w-full overflow-hidden flex justify-center" style="margin: 10px 0;">
+            <div class="p-2 sm:p-4 flex justify-start items-start min-h-[300px] sm:min-h-[400px]">
+                <div class="relative w-full max-w-full overflow-hidden flex justify-start" style="margin: 10px 0;">
                         <!-- Canvas Container -->
                         <div class="canvas-container" :style="{ 
                             width: canvasDimensions.width + 'px', 
                             height: canvasDimensions.height + 'px',
                             transform: `scale(${canvasScale})`,
-                            transformOrigin: 'top center',
-                            margin: '0 auto'
+                            transformOrigin: 'top left',
+                            margin: '0'
                         }">
                             <!-- Canvas -->
                             <div
