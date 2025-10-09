@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Head } from '@inertiajs/vue3';
-import { Download, Type, Image, Upload, X, Plus, Minus } from 'lucide-vue-next';
+import { Download, Type, Image, Upload, X, Plus, Minus, ImageIcon } from 'lucide-vue-next';
 import { ref, computed } from 'vue';
 import * as domtoimage from 'dom-to-image';
 import Swal from 'sweetalert2';
@@ -134,7 +134,7 @@ const initializeCanvasElements = () => {
             
             imageUrl: element.properties?.imageUrl || '',
             imageFit: element.properties?.imageFit || 'cover',
-            imagePlaceholder: element.properties?.imagePlaceholder || (element.type === 'image' ? 'Click to upload image' : ''),
+            imagePlaceholder: element.properties?.imagePlaceholder || (element.type === 'image' ? 'Image placeholder' : ''),
             imageShape: element.properties?.imageShape || 'rectangle',
         }
     }));
@@ -177,9 +177,10 @@ const handleElementMouseDown = (event: MouseEvent, element: CanvasElement) => {
     if (element.type === 'text') {
         event.preventDefault();
         isDragging.value = true;
+        // Adjust coordinates for canvas scaling
         dragStart.value = {
-            x: event.clientX - element.x,
-            y: event.clientY - element.y
+            x: event.clientX - (element.x * canvasScale.value),
+            y: event.clientY - (element.y * canvasScale.value)
         };
         draggedElement.value = element;
     }
@@ -187,8 +188,9 @@ const handleElementMouseDown = (event: MouseEvent, element: CanvasElement) => {
 
 const handleMouseMove = (event: MouseEvent) => {
     if (isDragging.value && draggedElement.value) {
-        draggedElement.value.x = event.clientX - dragStart.value.x;
-        draggedElement.value.y = event.clientY - dragStart.value.y;
+        // Adjust coordinates for canvas scaling
+        draggedElement.value.x = (event.clientX - dragStart.value.x) / canvasScale.value;
+        draggedElement.value.y = (event.clientY - dragStart.value.y) / canvasScale.value;
     }
 };
 
@@ -226,16 +228,29 @@ const canvasStyle = computed(() => {
     const scaleY = maxHeight / props.template.height;
     const scale = Math.min(scaleX, scaleY, 1); // Don't scale up
     
+    // Calculate scaled dimensions
+    const scaledWidth = props.template.width * scale;
+    const scaledHeight = props.template.height * scale;
+    
     return {
-        width: props.template.width + 'px',
-        height: props.template.height + 'px',
-        transform: `scale(${scale})`,
-        transformOrigin: 'top center',
+        width: scaledWidth + 'px',
+        height: scaledHeight + 'px',
+        transform: 'none', // Remove transform to avoid positioning issues
         backgroundImage: props.template.background_image_url ? `url(${props.template.background_image_url})` : (props.template.background_image ? `url(/storage/${props.template.background_image})` : 'none'),
         backgroundSize: 'cover',
         backgroundPosition: 'center',
-        backgroundRepeat: 'no-repeat'
+        backgroundRepeat: 'no-repeat',
+        position: 'relative' // Ensure proper positioning context
     };
+});
+
+// Calculate scale factor for element positioning
+const canvasScale = computed(() => {
+    const maxWidth = 800;
+    const maxHeight = 600;
+    const scaleX = maxWidth / props.template.width;
+    const scaleY = maxHeight / props.template.height;
+    return Math.min(scaleX, scaleY, 1);
 });
 
 
@@ -316,8 +331,9 @@ const onImageDrag = (event: MouseEvent) => {
     const deltaX = event.clientX - dragImageStart.value.x;
     const deltaY = event.clientY - dragImageStart.value.y;
     
-    const newPosX = dragImageStart.value.posX + deltaX;
-    const newPosY = dragImageStart.value.posY + deltaY;
+    // Adjust for canvas scaling
+    const newPosX = dragImageStart.value.posX + (deltaX / canvasScale.value);
+    const newPosY = dragImageStart.value.posY + (deltaY / canvasScale.value);
     
     // Update the element's crop position
     (cropElement.value.properties as any).cropPositionX = newPosX;
@@ -438,14 +454,24 @@ const generateImage = async () => {
 
         // Ultra high quality rendering with multiple fallback methods
         let dataUrl;
+        // Use the actual displayed canvas dimensions (scaled)
+        const displayedWidth = props.template.width * canvasScale.value;
+        const displayedHeight = props.template.height * canvasScale.value;
         const originalWidth = props.template.width;
         const originalHeight = props.template.height;
+        
+        // Debug: Log dimensions for verification
+        console.log('Download dimensions:', {
+            original: `${originalWidth}x${originalHeight}`,
+            displayed: `${displayedWidth}x${displayedHeight}`,
+            scale: canvasScale.value
+        });
         
         try {
             // Method 1: Ultra high quality with custom scaling
             const scaleFactor = 4; // 4x scale for ultra high quality
-            const ultraWidth = originalWidth * scaleFactor;
-            const ultraHeight = originalHeight * scaleFactor;
+            const ultraWidth = displayedWidth * scaleFactor;
+            const ultraHeight = displayedHeight * scaleFactor;
             
             dataUrl = await domtoimage.toPng(previewElement, {
                 quality: 1.0,
@@ -455,8 +481,8 @@ const generateImage = async () => {
                 style: {
                     transform: `scale(${scaleFactor})`,
                     transformOrigin: 'top left',
-                    width: originalWidth + 'px',
-                    height: originalHeight + 'px',
+                    width: displayedWidth + 'px',
+                    height: displayedHeight + 'px',
                     imageRendering: 'crisp-edges'
                 },
                 pixelRatio: 4, // Ultra high DPI
@@ -478,13 +504,13 @@ const generateImage = async () => {
                 dataUrl = await domtoimage.toPng(previewElement, {
                     quality: 1.0,
                     bgcolor: '#ffffff',
-                    width: originalWidth * 2, // 2x scale
-                    height: originalHeight * 2,
+                    width: displayedWidth * 2, // 2x scale
+                    height: displayedHeight * 2,
                     style: {
                         transform: 'scale(2)',
                         transformOrigin: 'top left',
-                        width: originalWidth + 'px',
-                        height: originalHeight + 'px'
+                        width: displayedWidth + 'px',
+                        height: displayedHeight + 'px'
                     },
                     pixelRatio: 3,
                     cacheBust: true,
@@ -497,8 +523,8 @@ const generateImage = async () => {
                 dataUrl = await domtoimage.toPng(previewElement, {
                     quality: 1.0,
                     bgcolor: '#ffffff',
-                    width: originalWidth,
-                    height: originalHeight,
+                    width: displayedWidth,
+                    height: displayedHeight,
                     pixelRatio: 2,
                     cacheBust: true
                 });
@@ -507,6 +533,7 @@ const generateImage = async () => {
 
 
         // Create download link with timestamp
+        // The downloaded image will match the displayed canvas dimensions
         const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
         const link = document.createElement('a');
         link.href = dataUrl;
@@ -763,10 +790,10 @@ const generateImage = async () => {
                                         :key="element.id"
                                         class="absolute"
                                         :style="{
-                                            left: element.x + 'px',
-                                            top: element.y + 'px',
-                                            width: element.width + 'px',
-                                            height: element.height + 'px',
+                                            left: (element.x * canvasScale) + 'px',
+                                            top: (element.y * canvasScale) + 'px',
+                                            width: (element.width * canvasScale) + 'px',
+                                            height: (element.height * canvasScale) + 'px',
                                             zIndex: element.zIndex,
                                             transform: `rotate(${element.rotation}deg)`,
                                             filter: element.properties.boxShadow !== 'none' ? `drop-shadow(${element.properties.boxShadow})` : 'none'
@@ -779,15 +806,19 @@ const generateImage = async () => {
                                             :style="{
                                             color: element.properties.color,
                                             backgroundColor: element.properties.backgroundColor,
-                                            fontSize: element.properties.fontSize + 'px',
+                                            fontSize: (element.properties.fontSize * canvasScale) + 'px',
                                             fontFamily: element.properties.fontFamily,
                                             fontWeight: element.properties.fontWeight,
                                             fontStyle: element.properties.fontStyle,
                                             textDecoration: element.properties.textDecoration,
                                             textAlign: element.properties.textAlign,
                                             lineHeight: element.properties.lineHeight,
-                                            border: element.properties.hasBorder ? `${element.properties.strokeWidth}px ${element.properties.borderStyle} ${element.properties.strokeColor}` : 'none',
-                                            borderRadius: element.properties.borderRadius + 'px'
+                                            border: element.properties.hasBorder ? `${(element.properties.strokeWidth * canvasScale)}px ${element.properties.borderStyle} ${element.properties.strokeColor}` : 'none',
+                                            borderRadius: (element.properties.borderRadius * canvasScale) + 'px',
+                                            padding: (8 * canvasScale) + 'px',
+                                            boxSizing: 'border-box',
+                                            wordWrap: 'break-word',
+                                            overflow: 'hidden'
                                             }"
                                             @mousedown="handleElementMouseDown($event, element)"
                                         >
@@ -797,8 +828,8 @@ const generateImage = async () => {
                                         <!-- Image Element -->
                                         <div v-else-if="element.type === 'image'" class="w-full h-full flex items-center justify-center overflow-hidden relative group" :style="{
                                             backgroundColor: element.properties.backgroundColor || 'transparent',
-                                            border: element.properties.hasBorder ? `${element.properties.strokeWidth}px ${element.properties.borderStyle} ${element.properties.strokeColor}` : 'none',
-                                            borderRadius: (element.properties.imageShape === 'rectangle' ? (element.properties.borderRadius || 0) + 'px' : '0px'),
+                                            border: element.properties.hasBorder ? `${(element.properties.strokeWidth * canvasScale)}px ${element.properties.borderStyle} ${element.properties.strokeColor}` : 'none',
+                                            borderRadius: (element.properties.imageShape === 'rectangle' ? ((element.properties.borderRadius || 0) * canvasScale) + 'px' : '0px'),
                                             clipPath: getImageClipPath(element.properties.imageShape || 'rectangle')
                                         }" @mousedown="handleElementMouseDown($event, element)">
                                             <img
@@ -813,7 +844,7 @@ const generateImage = async () => {
                                                     maxHeight: 'none',
                                                     objectFit: 'none',
                                                     transform: (element.properties as any).cropScale 
-                                                        ? `translate(-50%, -50%) scale(${(element.properties as any).cropScale}) translate(${((element.properties as any).cropPositionX || 0)}px, ${((element.properties as any).cropPositionY || 0)}px)` 
+                                                        ? `translate(-50%, -50%) scale(${(element.properties as any).cropScale}) translate(${((element.properties as any).cropPositionX || 0) * canvasScale}px, ${((element.properties as any).cropPositionY || 0) * canvasScale}px)` 
                                                         : 'translate(-50%, -50%)',
                                                     top: '50%',
                                                     left: '50%',
@@ -824,9 +855,9 @@ const generateImage = async () => {
                                             />
                                             
                                             
-                                            <div v-else class="flex flex-col items-center justify-center text-gray-500 text-sm text-center p-2">
-                                                <Upload class="h-8 w-8 mb-2" />
-                                                <span>{{ element.properties.imagePlaceholder }}</span>
+                                            <div v-else class="flex flex-col items-center justify-center text-gray-400 text-xs text-center p-2 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-800/50">
+                                                <ImageIcon class="h-6 w-6 mb-1 opacity-60" />
+                                                <span class="opacity-75">{{ element.properties.imagePlaceholder }}</span>
                                             </div>
                                         </div>
 
