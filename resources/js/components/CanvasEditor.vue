@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, onMounted, onUnmounted, watch } from 'vue';
+import { computed, ref, onMounted, onUnmounted } from 'vue';
 import { Upload, Layers, Copy, Trash2 } from 'lucide-vue-next';
 
 interface CanvasElement {
@@ -78,12 +78,6 @@ const handleBackgroundImageChange = (event: Event) => {
 // Window width for responsive design
 const windowWidth = ref(typeof window !== 'undefined' ? window.innerWidth : 1024);
 
-// Background drag and zoom functionality
-const backgroundTransform = ref({ x: 0, y: 0, scale: 1 });
-const isDraggingBackground = ref(false);
-const isZoomingBackground = ref(false);
-const dragStart = ref({ x: 0, y: 0 });
-const lastTouchDistance = ref(0);
 
 // Update window width on resize
 const updateWindowWidth = () => {
@@ -97,11 +91,6 @@ onMounted(() => {
 onUnmounted(() => {
     window.removeEventListener('resize', updateWindowWidth);
 });
-
-// Watch for canvas size changes and reset background position
-watch(() => [props.form.width, props.form.height], () => {
-    autoFitBackground();
-}, { deep: true });
 
 // Calculate responsive canvas dimensions
 const canvasDimensions = computed(() => {
@@ -249,158 +238,6 @@ const handleResizeEnd = () => {
     isResizing.value = false;
 };
 
-// Background drag and zoom handlers
-const handleBackgroundMouseDown = (event: MouseEvent) => {
-    // Only allow background dragging if no element is selected
-    if (props.backgroundImagePreview && !props.selectedElement) {
-        event.preventDefault();
-        isDraggingBackground.value = true;
-        dragStart.value = {
-            x: event.clientX - backgroundTransform.value.x,
-            y: event.clientY - backgroundTransform.value.y
-        };
-    }
-};
-
-const handleBackgroundMouseMove = (event: MouseEvent) => {
-    if (isDraggingBackground.value && props.backgroundImagePreview && !props.selectedElement) {
-        backgroundTransform.value.x = event.clientX - dragStart.value.x;
-        backgroundTransform.value.y = event.clientY - dragStart.value.y;
-    }
-};
-
-const handleBackgroundMouseUp = () => {
-    isDraggingBackground.value = false;
-};
-
-const handleBackgroundWheel = (event: WheelEvent) => {
-    // Only allow background zooming if no element is selected
-    if (props.backgroundImagePreview && !props.selectedElement) {
-        event.preventDefault();
-        const delta = event.deltaY > 0 ? 0.9 : 1.1;
-        const newScale = Math.max(0.1, Math.min(5, backgroundTransform.value.scale * delta));
-        
-        // Zoom towards mouse position
-        const rect = (event.target as HTMLElement).getBoundingClientRect();
-        const mouseX = event.clientX - rect.left;
-        const mouseY = event.clientY - rect.top;
-        
-        const scaleChange = newScale / backgroundTransform.value.scale;
-        backgroundTransform.value.x = mouseX - (mouseX - backgroundTransform.value.x) * scaleChange;
-        backgroundTransform.value.y = mouseY - (mouseY - backgroundTransform.value.y) * scaleChange;
-        backgroundTransform.value.scale = newScale;
-    }
-};
-
-// Touch handlers for mobile
-const handleBackgroundTouchStart = (event: TouchEvent) => {
-    // Only allow background touch interactions if no element is selected
-    if (props.backgroundImagePreview && !props.selectedElement) {
-        event.preventDefault();
-        if (event.touches.length === 1) {
-            isDraggingBackground.value = true;
-            dragStart.value = {
-                x: event.touches[0].clientX - backgroundTransform.value.x,
-                y: event.touches[0].clientY - backgroundTransform.value.y
-            };
-        } else if (event.touches.length === 2) {
-            isZoomingBackground.value = true;
-            const touch1 = event.touches[0];
-            const touch2 = event.touches[1];
-            lastTouchDistance.value = Math.sqrt(
-                Math.pow(touch2.clientX - touch1.clientX, 2) + 
-                Math.pow(touch2.clientY - touch1.clientY, 2)
-            );
-        }
-    }
-};
-
-const handleBackgroundTouchMove = (event: TouchEvent) => {
-    if (props.backgroundImagePreview && !props.selectedElement) {
-        event.preventDefault();
-        if (isDraggingBackground.value && event.touches.length === 1) {
-            backgroundTransform.value.x = event.touches[0].clientX - dragStart.value.x;
-            backgroundTransform.value.y = event.touches[0].clientY - dragStart.value.y;
-        } else if (isZoomingBackground.value && event.touches.length === 2) {
-            const touch1 = event.touches[0];
-            const touch2 = event.touches[1];
-            const currentDistance = Math.sqrt(
-                Math.pow(touch2.clientX - touch1.clientX, 2) + 
-                Math.pow(touch2.clientY - touch1.clientY, 2)
-            );
-            
-            if (lastTouchDistance.value > 0) {
-                const scaleChange = currentDistance / lastTouchDistance.value;
-                const newScale = Math.max(0.1, Math.min(5, backgroundTransform.value.scale * scaleChange));
-                
-                // Zoom towards center of touches
-                const centerX = (touch1.clientX + touch2.clientX) / 2;
-                const centerY = (touch1.clientY + touch2.clientY) / 2;
-                const rect = (event.target as HTMLElement).getBoundingClientRect();
-                const mouseX = centerX - rect.left;
-                const mouseY = centerY - rect.top;
-                
-                const scaleRatio = newScale / backgroundTransform.value.scale;
-                backgroundTransform.value.x = mouseX - (mouseX - backgroundTransform.value.x) * scaleRatio;
-                backgroundTransform.value.y = mouseY - (mouseY - backgroundTransform.value.y) * scaleRatio;
-                backgroundTransform.value.scale = newScale;
-            }
-            
-            lastTouchDistance.value = currentDistance;
-        }
-    }
-};
-
-const handleBackgroundTouchEnd = () => {
-    isDraggingBackground.value = false;
-    isZoomingBackground.value = false;
-    lastTouchDistance.value = 0;
-};
-
-// Reset background transform
-const resetBackgroundTransform = () => {
-    backgroundTransform.value = { x: 0, y: 0, scale: 1 };
-};
-
-// Auto-fit background to canvas when canvas size changes
-const autoFitBackground = () => {
-    if (props.backgroundImagePreview) {
-        // Reset position and scale to center the image
-        backgroundTransform.value = { x: 0, y: 0, scale: 1 };
-    }
-};
-
-// Fit background to canvas (show full image)
-const fitBackgroundToCanvas = () => {
-    if (props.backgroundImagePreview) {
-        // Get the image dimensions from the background image
-        const img = new Image();
-        img.onload = () => {
-            const canvasAspect = props.form.width / props.form.height;
-            const imageAspect = img.naturalWidth / img.naturalHeight;
-            
-            // Calculate scale to fit the image within the canvas
-            let scale = 1;
-            if (imageAspect > canvasAspect) {
-                // Image is wider than canvas - scale by width
-                scale = props.form.width / img.naturalWidth;
-            } else {
-                // Image is taller than canvas - scale by height
-                scale = props.form.height / img.naturalHeight;
-            }
-            
-            // Center the image
-            const scaledWidth = img.naturalWidth * scale;
-            const scaledHeight = img.naturalHeight * scale;
-            const x = (props.form.width - scaledWidth) / 2;
-            const y = (props.form.height - scaledHeight) / 2;
-            
-            backgroundTransform.value = { x, y, scale };
-        };
-        img.src = props.backgroundImagePreview;
-    }
-};
-
 // Image shape clip paths
 const getImageClipPath = (shape: string) => {
     switch (shape) {
@@ -450,35 +287,13 @@ const getImageClipPath = (shape: string) => {
                         </label>
                         <div v-if="backgroundImagePreview" class="flex items-center gap-2">
                             <img :src="backgroundImagePreview" alt="Background preview" class="h-6 w-6 object-cover rounded" />
-                            <span class="text-xs text-gray-500 dark:text-gray-400">Background set - Drag to move, scroll to zoom, use buttons to fit/reset</span>
+                            <span class="text-xs text-gray-500 dark:text-gray-400">Background set</span>
                         </div>
                     </div>
                     
 
                     <!-- Vertical Action Buttons -->
                     <div class="flex items-center gap-1">
-                        <button
-                            v-if="backgroundImagePreview"
-                            type="button"
-                            @click="fitBackgroundToCanvas"
-                            title="Fit Background to Canvas (Show Full Image)"
-                            class="p-2 text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
-                        >
-                            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"></path>
-                            </svg>
-                        </button>
-                        <button
-                            v-if="backgroundImagePreview"
-                            type="button"
-                            @click="resetBackgroundTransform"
-                            title="Reset Background Position & Zoom"
-                            class="p-2 text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
-                        >
-                            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
-                            </svg>
-                        </button>
                         <button
                             type="button"
                             @click="selectedElement && bringToFront(selectedElement.id)"
@@ -531,7 +346,7 @@ const getImageClipPath = (shape: string) => {
                         }">
                             <!-- Canvas -->
                             <div
-                                class="relative overflow-hidden bg-gray-50 dark:bg-gray-700 shadow-lg cursor-crosshair border-2 border-black"
+                                class="relative overflow-hidden bg-gray-50 dark:bg-gray-700 shadow-lg cursor-crosshair"
                                 :style="{
                                     width: props.form.width + 'px',
                                     height: props.form.height + 'px'
@@ -541,25 +356,11 @@ const getImageClipPath = (shape: string) => {
                                 @mouseup="handleMouseUp"
                             >
                             <!-- Background Image -->
-                            <div 
-                                v-if="backgroundImagePreview" 
-                                class="absolute inset-0 bg-contain bg-center bg-no-repeat z-0" 
-                                :class="selectedElement ? 'cursor-default' : 'cursor-move'"
-                                :style="{ 
-                                    backgroundImage: `url(${backgroundImagePreview})`,
-                                    width: '100%',
-                                    height: '100%',
-                                    transform: `translate(${backgroundTransform.x}px, ${backgroundTransform.y}px) scale(${backgroundTransform.scale})`,
-                                    transformOrigin: '0 0'
-                                }"
-                                @mousedown="handleBackgroundMouseDown"
-                                @mousemove="handleBackgroundMouseMove"
-                                @mouseup="handleBackgroundMouseUp"
-                                @wheel="handleBackgroundWheel"
-                                @touchstart="handleBackgroundTouchStart"
-                                @touchmove="handleBackgroundTouchMove"
-                                @touchend="handleBackgroundTouchEnd"
-                            ></div>
+                            <div v-if="backgroundImagePreview" class="absolute inset-0 bg-cover bg-center bg-no-repeat z-0" :style="{ 
+                                backgroundImage: `url(${backgroundImagePreview})`,
+                                width: '100%',
+                                height: '100%'
+                            }"></div>
                             
 
                             <!-- Empty State -->
@@ -581,13 +382,13 @@ const getImageClipPath = (shape: string) => {
                                 :key="element.id"
                                 :class="[
                                     'absolute cursor-move select-none',
-                                    selectedElement?.id === element.id ? 'border-2 border-blue-500' : ''
+                                    selectedElement?.id === element.id ? 'ring-2 ring-blue-500' : ''
                                 ]"
                                 :style="{
-                                    left: (selectedElement?.id === element.id ? element.x - 2 : element.x) + 'px',
-                                    top: (selectedElement?.id === element.id ? element.y - 2 : element.y) + 'px',
-                                    width: (selectedElement?.id === element.id ? element.width + 4 : element.width) + 'px',
-                                    height: (selectedElement?.id === element.id ? element.height + 4 : element.height) + 'px',
+                                    left: element.x + 'px',
+                                    top: element.y + 'px',
+                                    width: element.width + 'px',
+                                    height: element.height + 'px',
                                     transform: `rotate(${element.rotation}deg)`,
                                     zIndex: element.zIndex,
                                     filter: element.properties.boxShadow !== 'none' ? element.properties.boxShadow : 'none',

@@ -54,12 +54,8 @@ const form = ref({
 });
 
 const backgroundImagePreview = ref<string | null>(null);
-const originalImageDimensions = ref({ width: 0, height: 0 });
 
 onMounted(() => {
-    // Set default template to Original Size
-    selectedQuickTemplate.value = { name: 'Original Size', width: 0, height: 0 };
-    
     if (isEditMode.value && props.template) {
         form.value.name = props.template.name;
         form.value.width = props.template.width;
@@ -134,16 +130,6 @@ interface CanvasElement {
 watch(selectedElement, () => {
 }, { deep: true });
 
-// Auto-apply tool when selected (except for select tool)
-watch(selectedTool, (newTool) => {
-    if (newTool !== 'select') {
-        // Create element at center of canvas
-        const centerX = form.value.width / 2;
-        const centerY = form.value.height / 2;
-        createElement(newTool as CanvasElement['type'], centerX, centerY);
-    }
-});
-
 const createElement = (type: CanvasElement['type'], x: number, y: number) => {
     const maxZIndex = canvasElements.value.length > 0 ? Math.max(...canvasElements.value.map(el => el.zIndex)) : 0;
     
@@ -207,10 +193,11 @@ const updateElementProperty = (elementId: string, property: string, value: any) 
 };
 
 const handleCanvasClick = (event: MouseEvent) => {
-    // Only handle canvas clicks for deselection when select tool is active
-    if (selectedTool.value === 'select') {
-        // Deselect any selected element when clicking on empty canvas
-        selectedElement.value = null;
+    if (selectedTool.value !== 'select') {
+        const rect = (event.target as HTMLElement).getBoundingClientRect();
+        const x = event.clientX - rect.left;
+        const y = event.clientY - rect.top;
+        createElement(selectedTool.value as CanvasElement['type'], x, y);
     }
 };
 
@@ -328,104 +315,23 @@ const handleResizeElement = (elementId: string, width: number, height: number, x
 
 const applyQuickTemplate = (template: { name: string; width: number; height: number }) => {
     selectedQuickTemplate.value = template;
-    if (template.name !== 'Custom' && template.name !== 'Original Size') {
+    if (template.name !== 'Custom') {
         form.value.width = template.width;
         form.value.height = template.height;
-    } else if (template.name === 'Original Size') {
-        // Use the stored original dimensions if available
-        if (originalImageDimensions.value.width > 0) {
-            form.value.width = originalImageDimensions.value.width;
-            form.value.height = originalImageDimensions.value.height;
-        } else {
-            // Fallback to provided dimensions if no original image
-            form.value.width = template.width;
-            form.value.height = template.height;
-        }
     }
     isQuickTemplateDropdownOpen.value = false;
 };
 
 const handleBackgroundImageChange = (file: File) => {
     console.log('Background image file selected:', file);
-    console.log('File type:', file.type);
-    console.log('File size:', file.size);
-    console.log('File name:', file.name);
-    
-    // Validate file type
-    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
-    if (!allowedTypes.includes(file.type)) {
-        console.error('Invalid file type:', file.type);
-        Swal.fire({
-            title: 'Invalid File Type',
-            text: `Please select a valid image file. Detected type: ${file.type}. Supported types: JPEG, PNG, GIF, WebP`,
-            icon: 'error',
-            confirmButtonText: 'OK'
-        });
-        return;
-    }
-    
-    // Validate file size (10MB max)
-    const maxSize = 10 * 1024 * 1024; // 10MB
-    if (file.size > maxSize) {
-        Swal.fire({
-            title: 'File Too Large',
-            text: 'Please select an image smaller than 10MB',
-            icon: 'error',
-            confirmButtonText: 'OK'
-        });
-        return;
-    }
-    
     form.value.background_image = file;
     
-    // Create preview URL and get dimensions
+    // Create preview URL
     const reader = new FileReader();
     reader.onload = (e) => {
         const result = e.target?.result as string;
         console.log('Background image preview created:', result ? 'Yes' : 'No');
         backgroundImagePreview.value = result;
-        
-        // Get original image dimensions and update canvas size
-        const img = new Image();
-        img.onload = () => {
-            console.log('Image loaded, dimensions:', img.naturalWidth, 'x', img.naturalHeight);
-            
-            // Store original dimensions
-            originalImageDimensions.value = {
-                width: img.naturalWidth,
-                height: img.naturalHeight
-            };
-            
-            // Update canvas size
-            form.value.width = img.naturalWidth;
-            form.value.height = img.naturalHeight;
-            
-            // Update selected template to Original Size
-            selectedQuickTemplate.value = { 
-                name: 'Original Size', 
-                width: img.naturalWidth, 
-                height: img.naturalHeight 
-            };
-        };
-        img.onerror = () => {
-            console.error('Failed to load image');
-            Swal.fire({
-                title: 'Invalid Image',
-                text: 'The selected file is not a valid image',
-                icon: 'error',
-                confirmButtonText: 'OK'
-            });
-        };
-        img.src = result;
-    };
-    reader.onerror = () => {
-        console.error('Failed to read file');
-        Swal.fire({
-            title: 'File Read Error',
-            text: 'Failed to read the selected file',
-            icon: 'error',
-            confirmButtonText: 'OK'
-        });
     };
     reader.readAsDataURL(file);
 };
@@ -462,33 +368,7 @@ const submitForm = async () => {
         formDataObj.append('canvas_data', JSON.stringify(canvasElements.value));
         
         if (form.value.background_image) {
-            console.log('Adding background image to FormData:', {
-                file: form.value.background_image,
-                type: form.value.background_image.type,
-                size: form.value.background_image.size,
-                name: form.value.background_image.name
-            });
-            
-            // Verify file is still valid before adding to FormData
-            if (form.value.background_image instanceof File && form.value.background_image.size > 0) {
-                formDataObj.append('background_image', form.value.background_image, form.value.background_image.name);
-                console.log('File added to FormData successfully');
-            } else {
-                console.error('File is invalid or corrupted:', form.value.background_image);
-                Swal.fire({
-                    title: 'File Error',
-                    text: 'The selected file appears to be corrupted. Please try selecting the file again.',
-                    icon: 'error',
-                    confirmButtonText: 'OK'
-                });
-                return;
-            }
-        }
-        
-        // Debug FormData contents
-        console.log('FormData contents:');
-        for (let [key, value] of formDataObj.entries()) {
-            console.log(key, value);
+            formDataObj.append('background_image', form.value.background_image);
         }
 
         if (isEditMode.value) {
@@ -535,35 +415,18 @@ const submitForm = async () => {
         console.error('Error submitting form:', error);
         
         let errorMessage = 'An unexpected error occurred. Please try again.';
-        let errorTitle = 'Error!';
-        
-        if (error.response && error.response.data) {
-            if (error.response.data.message) {
-                errorMessage = error.response.data.message;
+        if (error.response && error.response.data && error.response.data.message) {
+            errorMessage = error.response.data.message;
+        } else if (error.response && error.response.data && error.response.data.errors) {
+            const errors = error.response.data.errors;
+            const firstError = Object.values(errors)[0];
+            if (Array.isArray(firstError) && firstError.length > 0) {
+                errorMessage = firstError[0];
             }
-            
-            if (error.response.data.errors) {
-                const errors = error.response.data.errors;
-                console.log('Validation errors:', errors);
-                
-                // Check for specific background image errors
-                if (errors.background_image) {
-                    errorTitle = 'Background Image Error';
-                    errorMessage = errors.background_image[0];
-                } else {
-                    // Get first error
-                    const firstError = Object.values(errors)[0];
-                    if (Array.isArray(firstError) && firstError.length > 0) {
-                        errorMessage = firstError[0];
-                    }
-                }
-            }
-        } else if (error.message) {
-            errorMessage = error.message;
         }
 
         Swal.fire({
-            title: errorTitle,
+            title: 'Error!',
             text: errorMessage,
             icon: 'error',
             confirmButtonText: 'OK'
@@ -602,7 +465,6 @@ const handleKeydown = (event: KeyboardEvent) => {
                             v-model:backgroundImagePreview="backgroundImagePreview"
                             v-model:selectedQuickTemplate="selectedQuickTemplate"
                             v-model:isQuickTemplateDropdownOpen="isQuickTemplateDropdownOpen"
-                            :originalImageDimensions="originalImageDimensions"
                             :is-edit-mode="isEditMode"
                             :is-submitting="isSubmitting"
                             @backgroundImageChange="handleBackgroundImageChange"

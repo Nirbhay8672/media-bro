@@ -100,48 +100,13 @@ class TemplateController extends Controller
     {
         $isUpdate = $template !== null;
         
-        // Debug request data before validation
-        Log::info('Request data before validation:', [
-            'has_file' => $request->hasFile('background_image'),
-            'file_info' => $request->hasFile('background_image') ? [
-                'original_name' => $request->file('background_image')->getClientOriginalName(),
-                'mime_type' => $request->file('background_image')->getMimeType(),
-                'size' => $request->file('background_image')->getSize(),
-                'extension' => $request->file('background_image')->getClientOriginalExtension(),
-                'is_valid' => $request->file('background_image')->isValid(),
-                'error' => $request->file('background_image')->getError()
-            ] : 'No file',
-            'all_files' => array_keys($request->allFiles()),
-            'request_keys' => array_keys($request->all()),
-            'content_type' => $request->header('Content-Type'),
-            'content_length' => $request->header('Content-Length')
-        ]);
-
-        // Custom validation for background image
-        $validator = \Validator::make($request->all(), [
+        $request->validate([
             'name' => 'required|string|max:255',
             'description' => 'nullable|string',
             'width' => 'required|integer|min:100|max:4000',
             'height' => 'required|integer|min:100|max:4000',
-            'background_image' => 'nullable|file|max:10240',
+            'background_image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:10240',
         ]);
-
-        // Add custom validation for image types
-        $validator->after(function ($validator) use ($request) {
-            if ($request->hasFile('background_image')) {
-                $file = $request->file('background_image');
-                $allowedMimes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
-                
-                if (!in_array($file->getMimeType(), $allowedMimes)) {
-                    $validator->errors()->add('background_image', 'The background image must be a file of type: jpeg, png, jpg, gif, webp.');
-                }
-            }
-        });
-
-        if ($validator->fails()) {
-            Log::error('Validation failed:', $validator->errors()->toArray());
-            return back()->withErrors($validator);
-        }
 
         if ($isUpdate) {
             // Debug logging for update
@@ -178,36 +143,11 @@ class TemplateController extends Controller
         $template->canvas_data = $canvasData;
 
         if ($request->hasFile('background_image')) {
-            $file = $request->file('background_image');
-            
-            // Debug file information
-            Log::info('Background image file details:', [
-                'original_name' => $file->getClientOriginalName(),
-                'mime_type' => $file->getMimeType(),
-                'size' => $file->getSize(),
-                'extension' => $file->getClientOriginalExtension(),
-                'is_valid' => $file->isValid(),
-                'error' => $file->getError()
-            ]);
-            
-            // Additional validation
-            if (!$file->isValid()) {
-                Log::error('Invalid file upload:', [
-                    'error_code' => $file->getError(),
-                    'error_message' => $file->getErrorMessage()
-                ]);
-                return back()->withErrors([
-                    'background_image' => 'Invalid file upload. Please try again.'
-                ]);
-            }
-            
             // Delete old background image if updating
             if ($isUpdate && $template->background_image) {
                 Storage::disk('public')->delete($template->background_image);
             }
-            
-            $template->background_image = $file->store('templates/backgrounds', 'public');
-            Log::info('Background image stored:', ['path' => $template->background_image]);
+            $template->background_image = $request->file('background_image')->store('templates/backgrounds', 'public');
         }
 
         $template->save();
