@@ -190,6 +190,7 @@ const isSubmitting = ref(false);
 const isResizing = ref(false);
 const resizeHandle = ref('');
 const resizeStart = ref({ x: 0, y: 0, width: 0, height: 0, fontSize: 0 });
+const isAutoCreating = ref(false);
 
 const isQuickTemplateDropdownOpen = ref(false);
 const selectedQuickTemplate = ref<{ name: string; width: number; height: number } | null>(null);
@@ -235,6 +236,25 @@ interface CanvasElement {
 watch(selectedElement, () => {
 }, { deep: true });
 
+// Watch for tool selection and automatically place elements
+watch(selectedTool, (newTool) => {
+    if (newTool !== 'select' && !isAutoCreating.value) {
+        isAutoCreating.value = true;
+        
+        // Automatically place the element at the center of the canvas
+        const elementWidth = Math.round(form.value.width * 0.2); // 20% of canvas width
+        const elementHeight = newTool === 'text' ? Math.round(form.value.width * 0.1) : Math.round(form.value.width * 0.2); // 10% for text, 20% for others
+        const centerX = form.value.width / 2 - elementWidth / 2; // Center horizontally
+        const centerY = form.value.height / 2 - elementHeight / 2; // Center vertically
+        
+        createElement(newTool as CanvasElement['type'], centerX, centerY);
+        
+        // Switch back to select tool after creating
+        selectedTool.value = 'select';
+        isAutoCreating.value = false;
+    }
+});
+
 const createElement = (type: CanvasElement['type'], x: number, y: number) => {
     const maxZIndex = canvasElements.value.length > 0 ? Math.max(...canvasElements.value.map(el => el.zIndex)) : 0;
     
@@ -243,13 +263,13 @@ const createElement = (type: CanvasElement['type'], x: number, y: number) => {
         type,
         x,
         y,
-        width: type === 'text' ? 200 : 100,
-        height: type === 'text' ? 50 : 100,
+        width: Math.round(form.value.width * 0.2), // 20% of canvas width
+        height: type === 'text' ? Math.round(form.value.width * 0.1) : Math.round(form.value.width * 0.2), // 10% for text, 20% for others
         rotation: 0,
         zIndex: maxZIndex + 1,
         properties: {
             text: type === 'text' ? 'Sample Text' : '',
-            fontSize: type === 'text' ? 16 : undefined,
+            fontSize: type === 'text' ? Math.round(form.value.width * 0.02) : undefined, // 2% of canvas width
             fontFamily: type === 'text' ? 'Arial' : undefined,
             fontWeight: type === 'text' ? 'normal' : undefined,
             fontStyle: type === 'text' ? 'normal' : undefined,
@@ -276,7 +296,6 @@ const createElement = (type: CanvasElement['type'], x: number, y: number) => {
     
     canvasElements.value.push(newElement);
     selectedElement.value = newElement;
-    selectedTool.value = 'select';
 };
 
 const selectElement = (element: CanvasElement) => {
@@ -298,11 +317,10 @@ const updateElementProperty = (elementId: string, property: string, value: any) 
 };
 
 const handleCanvasClick = (event: MouseEvent) => {
-    if (selectedTool.value !== 'select') {
-        const rect = (event.target as HTMLElement).getBoundingClientRect();
-        const x = event.clientX - rect.left;
-        const y = event.clientY - rect.top;
-        createElement(selectedTool.value as CanvasElement['type'], x, y);
+    // Canvas click is now only used for deselecting elements
+    // Elements are automatically created when tools are selected
+    if (selectedTool.value === 'select') {
+        selectedElement.value = null;
     }
 };
 
