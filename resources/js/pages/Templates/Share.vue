@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Head } from '@inertiajs/vue3';
-import { Download, Type, Image, Upload, X, Plus, Minus, ImageIcon } from 'lucide-vue-next';
+import { Download, Type, Image, Upload, X, Plus, Minus, ImageIcon, ChevronUp, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-vue-next';
 import { ref, computed } from 'vue';
 import * as domtoimage from 'dom-to-image';
 import Swal from 'sweetalert2';
@@ -72,7 +72,7 @@ const isGenerating = ref(false);
 const isCroppingModalOpen = ref(false);
 const cropImageUrl = ref<string>('');
 const cropElement = ref<CanvasElement | null>(null);
-const cropScale = ref(0.62);
+const cropScale = ref(10);
 const cropPositionX = ref(0);
 const cropPositionY = ref(0);
 const cropOpacity = ref(1);
@@ -277,7 +277,7 @@ const handleImageUpload = (event: Event, element: CanvasElement) => {
     element.properties.imageUrl = imageUrl;
     // Initialize crop settings if not set
     if (!(element.properties as any).cropScale) {
-        (element.properties as any).cropScale = 0.62;
+        (element.properties as any).cropScale = 10;
     }
     if (!(element.properties as any).cropPositionX) {
         (element.properties as any).cropPositionX = 0;
@@ -292,19 +292,19 @@ const handleImageUpload = (event: Event, element: CanvasElement) => {
 
 // Crop control functions
 const zoomInImage = (element: CanvasElement) => {
-    const currentScale = (element.properties as any).cropScale || 1;
-    const newScale = Math.min(currentScale + 0.1, 3);
+    const currentScale = (element.properties as any).cropScale || 10;
+    const newScale = Math.min(currentScale + 10, 200);
     (element.properties as any).cropScale = newScale;
 };
 
 const zoomOutImage = (element: CanvasElement) => {
-    const currentScale = (element.properties as any).cropScale || 1;
-    const newScale = Math.max(currentScale - 0.1, 0.5);
+    const currentScale = (element.properties as any).cropScale || 10;
+    const newScale = Math.max(currentScale - 10, 10);
     (element.properties as any).cropScale = newScale;
 };
 
 const updateImageScale = (element: CanvasElement, scale: number) => {
-    (element.properties as any).cropScale = Math.max(0.5, Math.min(3, scale));
+    (element.properties as any).cropScale = Math.max(10, Math.min(200, scale));
 };
 
 const handleImageClick = (event: MouseEvent, element: CanvasElement) => {
@@ -312,6 +312,7 @@ const handleImageClick = (event: MouseEvent, element: CanvasElement) => {
     selectedImageElement.value = element;
 };
 
+// Image drag functionality
 const startImageDrag = (event: MouseEvent, element: CanvasElement) => {
     event.stopPropagation();
     isDraggingImage.value = true;
@@ -342,6 +343,27 @@ const onImageDrag = (event: MouseEvent) => {
 
 const stopImageDrag = () => {
     isDraggingImage.value = false;
+};
+
+// Image positioning functions (alternative to drag)
+const moveImageUp = (element: CanvasElement) => {
+    const currentY = (element.properties as any).cropPositionY || 0;
+    (element.properties as any).cropPositionY = currentY - 10;
+};
+
+const moveImageDown = (element: CanvasElement) => {
+    const currentY = (element.properties as any).cropPositionY || 0;
+    (element.properties as any).cropPositionY = currentY + 10;
+};
+
+const moveImageLeft = (element: CanvasElement) => {
+    const currentX = (element.properties as any).cropPositionX || 0;
+    (element.properties as any).cropPositionX = currentX - 10;
+};
+
+const moveImageRight = (element: CanvasElement) => {
+    const currentX = (element.properties as any).cropPositionX || 0;
+    (element.properties as any).cropPositionX = currentX + 10;
 };
 
 
@@ -703,45 +725,83 @@ const generateImage = async () => {
                                 <!-- Zoom Controls -->
                                 <div>
                                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                        Zoom: {{ Math.round(((selectedImageElement.properties as any).cropScale || 1) * 100) }}%
+                                        Zoom: {{ (selectedImageElement.properties as any).cropScale || 10 }}%
                                     </label>
                                     <div class="flex items-center gap-3">
                                         <button
                                             @click="zoomOutImage(selectedImageElement)"
                                             class="p-2 rounded-lg border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-                                            :disabled="((selectedImageElement.properties as any).cropScale || 1) <= 0.5"
+                                            :disabled="((selectedImageElement.properties as any).cropScale || 10) <= 10"
                                         >
                                             <Minus class="w-4 h-4" />
                                         </button>
                                         <div class="flex-1">
                                             <input
                                                 type="range"
-                                                :value="(selectedImageElement.properties as any).cropScale || 1"
+                                                :value="(selectedImageElement.properties as any).cropScale || 10"
                                                 @input="(event) => updateImageScale(selectedImageElement, parseFloat((event.target as HTMLInputElement).value))"
-                                                min="0.5"
-                                                max="3"
-                                                step="0.1"
+                                                min="10"
+                                                max="200"
+                                                step="1"
                                                 class="w-full"
                                             />
                                         </div>
                                         <button
                                             @click="zoomInImage(selectedImageElement)"
                                             class="p-2 rounded-lg border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-                                            :disabled="((selectedImageElement.properties as any).cropScale || 1) >= 3"
+                                            :disabled="((selectedImageElement.properties as any).cropScale || 10) >= 200"
                                         >
                                             <Plus class="w-4 h-4" />
                                         </button>
                                     </div>
                                 </div>
 
-                                <!-- Instructions -->
-                                <div class="text-xs text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-700 p-3 rounded-lg">
-                                    <p class="font-medium mb-1">How to use:</p>
-                                    <ul class="space-y-1">
-                                        <li>• Click and drag the image to position it</li>
-                                        <li>• Use zoom controls to adjust the size</li>
-                                        <li>• The image will be cropped to the shape</li>
-                                    </ul>
+                                <!-- Position Controls -->
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                        Position
+                                    </label>
+                                    <div class="space-y-2">
+                                        <!-- Up Button -->
+                                        <div class="flex justify-center">
+                                            <button
+                                                @click="moveImageUp(selectedImageElement)"
+                                                class="p-2 rounded-lg border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                                                title="Move Up"
+                                            >
+                                                <ChevronUp class="w-4 h-4" />
+                                            </button>
+                                        </div>
+                                        
+                                        <!-- Left and Right Buttons -->
+                                        <div class="flex justify-center gap-2">
+                                            <button
+                                                @click="moveImageLeft(selectedImageElement)"
+                                                class="p-2 rounded-lg border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                                                title="Move Left"
+                                            >
+                                                <ChevronLeft class="w-4 h-4" />
+                                            </button>
+                                            <button
+                                                @click="moveImageRight(selectedImageElement)"
+                                                class="p-2 rounded-lg border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                                                title="Move Right"
+                                            >
+                                                <ChevronRight class="w-4 h-4" />
+                                            </button>
+                                        </div>
+                                        
+                                        <!-- Down Button -->
+                                        <div class="flex justify-center">
+                                            <button
+                                                @click="moveImageDown(selectedImageElement)"
+                                                class="p-2 rounded-lg border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                                                title="Move Down"
+                                            >
+                                                <ChevronDown class="w-4 h-4" />
+                                            </button>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -832,7 +892,7 @@ const generateImage = async () => {
                                                     maxHeight: 'none',
                                                     objectFit: 'none',
                                                     transform: (element.properties as any).cropScale 
-                                                        ? `translate(-50%, -50%) scale(${(element.properties as any).cropScale}) translate(${((element.properties as any).cropPositionX || 0) * canvasScale}px, ${((element.properties as any).cropPositionY || 0) * canvasScale}px)` 
+                                                        ? `translate(-50%, -50%) scale(${((element.properties as any).cropScale || 0) / 100}) translate(${((element.properties as any).cropPositionX || 0) * canvasScale}px, ${((element.properties as any).cropPositionY || 0) * canvasScale}px)` 
                                                         : 'translate(-50%, -50%)',
                                                     top: '50%',
                                                     left: '50%',
