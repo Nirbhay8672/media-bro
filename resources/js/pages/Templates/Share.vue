@@ -292,19 +292,19 @@ const handleImageUpload = (event: Event, element: CanvasElement) => {
 
 // Crop control functions
 const zoomInImage = (element: CanvasElement) => {
-    const currentScale = (element.properties as any).cropScale || 10;
-    const newScale = Math.min(currentScale + 10, 200);
+    const currentScale = (element.properties as any).cropScale || 0;
+    const newScale = Math.min(currentScale + 1, 200);
     (element.properties as any).cropScale = newScale;
 };
 
 const zoomOutImage = (element: CanvasElement) => {
-    const currentScale = (element.properties as any).cropScale || 10;
-    const newScale = Math.max(currentScale - 10, 10);
+    const currentScale = (element.properties as any).cropScale || 0;
+    const newScale = Math.max(currentScale - 1, 0);
     (element.properties as any).cropScale = newScale;
 };
 
 const updateImageScale = (element: CanvasElement, scale: number) => {
-    (element.properties as any).cropScale = Math.max(10, Math.min(200, scale));
+    (element.properties as any).cropScale = Math.max(0, Math.min(200, scale));
 };
 
 const handleImageClick = (event: MouseEvent, element: CanvasElement) => {
@@ -725,22 +725,22 @@ const generateImage = async () => {
                                 <!-- Zoom Controls -->
                                 <div>
                                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                        Zoom: {{ (selectedImageElement.properties as any).cropScale || 10 }}%
+                                        Zoom: {{ (selectedImageElement.properties as any).cropScale || 0 }}%
                                     </label>
                                     <div class="flex items-center gap-3">
                                         <button
                                             @click="zoomOutImage(selectedImageElement)"
                                             class="p-2 rounded-lg border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-                                            :disabled="((selectedImageElement.properties as any).cropScale || 10) <= 10"
+                                            :disabled="((selectedImageElement.properties as any).cropScale || 0) <= 0"
                                         >
                                             <Minus class="w-4 h-4" />
                                         </button>
                                         <div class="flex-1">
                                             <input
                                                 type="range"
-                                                :value="(selectedImageElement.properties as any).cropScale || 10"
+                                                :value="(selectedImageElement.properties as any).cropScale || 0"
                                                 @input="(event) => updateImageScale(selectedImageElement, parseFloat((event.target as HTMLInputElement).value))"
-                                                min="10"
+                                                min="0"
                                                 max="200"
                                                 step="1"
                                                 class="w-full"
@@ -749,7 +749,7 @@ const generateImage = async () => {
                                         <button
                                             @click="zoomInImage(selectedImageElement)"
                                             class="p-2 rounded-lg border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-                                            :disabled="((selectedImageElement.properties as any).cropScale || 10) >= 200"
+                                            :disabled="((selectedImageElement.properties as any).cropScale || 0) >= 200"
                                         >
                                             <Plus class="w-4 h-4" />
                                         </button>
@@ -891,9 +891,7 @@ const generateImage = async () => {
                                                     maxWidth: 'none',
                                                     maxHeight: 'none',
                                                     objectFit: 'none',
-                                                    transform: (element.properties as any).cropScale 
-                                                        ? `translate(-50%, -50%) scale(${((element.properties as any).cropScale || 0) / 100}) translate(${((element.properties as any).cropPositionX || 0) * canvasScale}px, ${((element.properties as any).cropPositionY || 0) * canvasScale}px)` 
-                                                        : 'translate(-50%, -50%)',
+                                                    transform: `translate(-50%, -50%) scale(${Math.max(((element.properties as any).cropScale || 0), 1) / 100}) translate(${((element.properties as any).cropPositionX || 0) * canvasScale}px, ${((element.properties as any).cropPositionY || 0) * canvasScale}px)`,
                                                     top: '50%',
                                                     left: '50%',
                                                     transformOrigin: 'center'
