@@ -72,7 +72,7 @@ const isGenerating = ref(false);
 const isCroppingModalOpen = ref(false);
 const cropImageUrl = ref<string>('');
 const cropElement = ref<CanvasElement | null>(null);
-const cropScale = ref(0.5);
+const cropScale = ref(0.62);
 const cropPositionX = ref(0);
 const cropPositionY = ref(0);
 const cropOpacity = ref(1);
@@ -101,7 +101,7 @@ const initializeCanvasElements = () => {
     // Debug: Log template data for image elements
     const imageElements = templateData.filter((el: any) => el.type === 'image');
     if (imageElements.length > 0) {
-        console.log('Template image elements:', imageElements);
+        // Image elements found
     }
 
     canvasElements.value = templateData.map((element: any) => ({
@@ -134,7 +134,7 @@ const initializeCanvasElements = () => {
             
             imageUrl: element.properties?.imageUrl || '',
             imageFit: element.properties?.imageFit || 'cover',
-            imagePlaceholder: element.properties?.imagePlaceholder || (element.type === 'image' ? 'Image placeholder' : ''),
+            imagePlaceholder: element.properties?.imagePlaceholder || (element.type === 'image' ? '' : ''),
             imageShape: element.properties?.imageShape || 'rectangle',
         }
     }));
@@ -277,7 +277,7 @@ const handleImageUpload = (event: Event, element: CanvasElement) => {
     element.properties.imageUrl = imageUrl;
     // Initialize crop settings if not set
     if (!(element.properties as any).cropScale) {
-        (element.properties as any).cropScale = 1;
+        (element.properties as any).cropScale = 0.62;
     }
     if (!(element.properties as any).cropPositionX) {
         (element.properties as any).cropPositionX = 0;
@@ -353,14 +353,7 @@ const applyCrop = () => {
         (cropElement.value.properties as any).cropPositionX = cropPositionX.value;
         (cropElement.value.properties as any).cropPositionY = cropPositionY.value;
         
-        // Debug: Log the applied settings
-        console.log('Applied crop settings:', {
-            imageShape: cropElement.value.properties.imageShape,
-            cropScale: cropScale.value,
-            cropPositionX: cropPositionX.value,
-            cropPositionY: cropPositionY.value,
-            imageUrl: cropImageUrl.value
-        });
+        // Crop settings applied
     }
     closeCropModal();
 };
@@ -460,12 +453,7 @@ const generateImage = async () => {
         const originalWidth = props.template.width;
         const originalHeight = props.template.height;
         
-        // Debug: Log dimensions for verification
-        console.log('Download dimensions:', {
-            original: `${originalWidth}x${originalHeight}`,
-            displayed: `${displayedWidth}x${displayedHeight}`,
-            scale: canvasScale.value
-        });
+        // Download dimensions calculated
         
         try {
             // Method 1: Ultra high quality with custom scaling
@@ -855,9 +843,11 @@ const generateImage = async () => {
                                             />
                                             
                                             
-                                            <div v-else class="flex flex-col items-center justify-center text-gray-400 text-xs text-center p-2 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-800/50">
-                                                <ImageIcon class="h-6 w-6 mb-1 opacity-60" />
-                                                <span class="opacity-75">{{ element.properties.imagePlaceholder }}</span>
+                                            <div v-else class="flex items-center justify-center text-gray-400 bg-gray-50 dark:bg-gray-800/50 w-full h-full">
+                                                <ImageIcon class="opacity-60" :style="{
+                                                    width: Math.min(element.width * canvasScale * 0.4, 32) + 'px',
+                                                    height: Math.min(element.height * canvasScale * 0.4, 32) + 'px'
+                                                }" />
                                             </div>
                                         </div>
 
