@@ -479,11 +479,11 @@ const generateImage = async () => {
         
         try {
             // Method 1: Ultra high quality with custom scaling
-            const scaleFactor = 4; // 4x scale for ultra high quality
+            const scaleFactor = 6; // 6x scale for ultra high quality
             const ultraWidth = displayedWidth * scaleFactor;
             const ultraHeight = displayedHeight * scaleFactor;
             
-            dataUrl = await domtoimage.toPng(previewElement, {
+            dataUrl = await domtoimage.toJpeg(previewElement, {
                 quality: 1.0,
                 bgcolor: '#ffffff',
                 width: ultraWidth,
@@ -495,7 +495,7 @@ const generateImage = async () => {
                     height: displayedHeight + 'px',
                     imageRendering: 'crisp-edges'
                 },
-                pixelRatio: 4, // Ultra high DPI
+                pixelRatio: 6, // Ultra high DPI
                 cacheBust: true,
                 filter: (node) => {
                     // Include all elements for maximum detail
@@ -511,18 +511,18 @@ const generateImage = async () => {
             
             try {
                 // Method 2: High quality fallback
-                dataUrl = await domtoimage.toPng(previewElement, {
+                dataUrl = await domtoimage.toJpeg(previewElement, {
                     quality: 1.0,
                     bgcolor: '#ffffff',
-                    width: displayedWidth * 2, // 2x scale
-                    height: displayedHeight * 2,
+                    width: displayedWidth * 4, // 4x scale
+                    height: displayedHeight * 4,
                     style: {
-                        transform: 'scale(2)',
+                        transform: 'scale(4)',
                         transformOrigin: 'top left',
                         width: displayedWidth + 'px',
                         height: displayedHeight + 'px'
                     },
-                    pixelRatio: 3,
+                    pixelRatio: 4,
                     cacheBust: true,
                     useCORS: true
                 });
@@ -530,12 +530,12 @@ const generateImage = async () => {
             } catch (highError) {
                 
                 // Method 3: Standard quality as last resort
-                dataUrl = await domtoimage.toPng(previewElement, {
+                dataUrl = await domtoimage.toJpeg(previewElement, {
                     quality: 1.0,
                     bgcolor: '#ffffff',
                     width: displayedWidth,
                     height: displayedHeight,
-                    pixelRatio: 2,
+                    pixelRatio: 3,
                     cacheBust: true
                 });
             }
@@ -547,7 +547,7 @@ const generateImage = async () => {
         const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
         const link = document.createElement('a');
         link.href = dataUrl;
-        link.download = `${props.template.name}_${timestamp}.png`;
+        link.download = `${props.template.name}_${timestamp}.jpg`;
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
@@ -562,7 +562,7 @@ const generateImage = async () => {
                     'Accept': 'application/json'
                 },
                 body: JSON.stringify({
-                    file_name: `${props.template.name}_${timestamp}.png`,
+                    file_name: `${props.template.name}_${timestamp}.jpg`,
                     file_size: dataUrl.length // Approximate file size
                 })
             });
