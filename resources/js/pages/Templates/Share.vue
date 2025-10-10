@@ -467,35 +467,25 @@ const generateImage = async () => {
         // Convert blob URLs first
         await convertBlobUrlsToDataUrls();
 
-        // Ultra high quality rendering with multiple fallback methods
+        // Download with original canvas dimensions and maximum quality
         let dataUrl;
-        // Use the actual displayed canvas dimensions (scaled)
-        const displayedWidth = props.template.width * canvasScale.value;
-        const displayedHeight = props.template.height * canvasScale.value;
         const originalWidth = props.template.width;
         const originalHeight = props.template.height;
         
-        // Download dimensions calculated
-        
         try {
-            // Method 1: Ultra high quality with custom scaling
-            const scaleFactor = 6; // 6x scale for ultra high quality
-            const ultraWidth = displayedWidth * scaleFactor;
-            const ultraHeight = displayedHeight * scaleFactor;
-            
+            // Method 1: Original dimensions with maximum quality
             dataUrl = await domtoimage.toJpeg(previewElement, {
-                quality: 1.0,
-                bgcolor: '#ffffff',
-                width: ultraWidth,
-                height: ultraHeight,
+                quality: 1.0, // Maximum quality (no compression loss)
+                width: originalWidth, // Use original canvas width
+                height: originalHeight, // Use original canvas height
                 style: {
-                    transform: `scale(${scaleFactor})`,
+                    transform: `scale(${1 / canvasScale.value})`, // Scale up to original size
                     transformOrigin: 'top left',
-                    width: displayedWidth + 'px',
-                    height: displayedHeight + 'px',
+                    width: (originalWidth * canvasScale.value) + 'px',
+                    height: (originalHeight * canvasScale.value) + 'px',
                     imageRendering: 'crisp-edges'
                 },
-                pixelRatio: 6, // Ultra high DPI
+                pixelRatio: 1, // Use 1:1 pixel ratio for original quality
                 cacheBust: true,
                 filter: (node) => {
                     // Include all elements for maximum detail
@@ -506,36 +496,35 @@ const generateImage = async () => {
                 allowTaint: true
             });
             
-            
-        } catch (ultraError) {
+        } catch (originalError) {
             
             try {
-                // Method 2: High quality fallback
+                // Method 2: Fallback with 2x scaling for better quality
                 dataUrl = await domtoimage.toJpeg(previewElement, {
                     quality: 1.0,
                     bgcolor: '#ffffff',
-                    width: displayedWidth * 4, // 4x scale
-                    height: displayedHeight * 4,
+                    width: originalWidth * 2, // 2x scale for better quality
+                    height: originalHeight * 2,
                     style: {
-                        transform: 'scale(4)',
+                        transform: `scale(${2 / canvasScale.value})`,
                         transformOrigin: 'top left',
-                        width: displayedWidth + 'px',
-                        height: displayedHeight + 'px'
+                        width: (originalWidth * canvasScale.value) + 'px',
+                        height: (originalHeight * canvasScale.value) + 'px'
                     },
-                    pixelRatio: 4,
+                    pixelRatio: 2,
                     cacheBust: true,
                     useCORS: true
                 });
                 
-            } catch (highError) {
+            } catch (fallbackError) {
                 
-                // Method 3: Standard quality as last resort
+                // Method 3: Last resort with original dimensions
                 dataUrl = await domtoimage.toJpeg(previewElement, {
                     quality: 1.0,
                     bgcolor: '#ffffff',
-                    width: displayedWidth,
-                    height: displayedHeight,
-                    pixelRatio: 3,
+                    width: originalWidth,
+                    height: originalHeight,
+                    pixelRatio: 1,
                     cacheBust: true
                 });
             }
@@ -543,7 +532,7 @@ const generateImage = async () => {
 
 
         // Create download link with timestamp
-        // The downloaded image will match the displayed canvas dimensions
+        // The downloaded image will match the original canvas dimensions
         const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
         const link = document.createElement('a');
         link.href = dataUrl;
