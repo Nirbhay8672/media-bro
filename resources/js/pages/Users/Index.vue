@@ -498,17 +498,8 @@ const getSortIcon = (field: string) => {
                                     @click="handleSort('templates_count')"
                                     class="flex items-center gap-1 hover:text-blue-600 dark:hover:text-blue-400"
                                 >
-                                    Templates
+                                    Templates & Memory
                                     <component :is="getSortIcon('templates_count')" class="h-3 w-3" />
-                                </button>
-                            </TableHead>
-                            <TableHead>
-                                <button
-                                    @click="handleSort('memory_usage')"
-                                    class="flex items-center gap-1 hover:text-blue-600 dark:hover:text-blue-400"
-                                >
-                                    Memory Usage
-                                    <component :is="getSortIcon('memory_usage')" class="h-3 w-3" />
                                 </button>
                             </TableHead>
                             <TableHead class="w-[50px]"></TableHead>
@@ -621,23 +612,20 @@ const getSortIcon = (field: string) => {
                             </TableCell>
                             <TableCell>
                                 <div v-if="user.subscription_start_date && user.subscription_end_date" class="text-sm">
-                                    <div>Start: {{ formatDate(user.subscription_start_date) }}</div>
-                                    <div>End: {{ formatDate(user.subscription_end_date) }}</div>
+                                    <div class="flex items-center gap-2">
+                                        <span>{{ formatDate(user.subscription_start_date) }}</span>
+                                        <span class="text-gray-400">→</span>
+                                        <span>{{ formatDate(user.subscription_end_date) }}</span>
+                                    </div>
                                 </div>
                                 <span v-else class="text-muted-foreground">No subscription</span>
                             </TableCell>
                             <TableCell>
-                                <Badge variant="secondary">
-                                    {{ user.templates_count || 0 }} templates
-                                </Badge>
-                            </TableCell>
-                            <TableCell>
-                                <div class="flex items-center gap-2">
-                                    <div class="text-sm font-medium">
-                                        {{ formatMemoryUsage(user.memory_usage ?? 0) }}
-                                    </div>
-                                    <div v-if="(user.memory_usage ?? 0) > 0" class="text-xs text-muted-foreground">
-                                        ({{ user.templates_count || 0 }} files)
+                                <div class="space-y-1">
+                                    <div>
+                                        <Badge variant="secondary">
+                                            {{ user.templates_count || 0 }} templates | {{ formatMemoryUsage(user.memory_usage ?? 0) }}
+                                        </Badge>
                                     </div>
                                 </div>
                             </TableCell>
