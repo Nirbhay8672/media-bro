@@ -21,7 +21,7 @@ class UserController extends Controller
             ->where('role', 'admin')
             ->paginate(500);
         
-        // Calculate memory usage for each user
+        // Calculate memory usage for each user and make display_password visible
         $users->getCollection()->transform(function ($user) {
             $memoryUsage = 0;
             
@@ -36,6 +36,7 @@ class UserController extends Controller
             }
             
             $user->memory_usage = $memoryUsage;
+            $user->makeVisible(['display_password']); // Make display_password visible for modals
             return $user;
         });
         
@@ -76,6 +77,7 @@ class UserController extends Controller
             'email' => $request->email,
             'mobile' => $request->mobile,
             'password' => Hash::make($request->password),
+            'display_password' => $request->password, // Store original password for display
             'subscription_start_date' => $request->subscription_start_date,
             'subscription_end_date' => $request->subscription_end_date,
             'role' => $request->role,
@@ -118,6 +120,7 @@ class UserController extends Controller
 
         if ($request->filled('password')) {
             $updateData['password'] = Hash::make($request->password);
+            $updateData['display_password'] = $request->password; // Update display password
         }
 
         $user->update($updateData);
@@ -145,6 +148,9 @@ class UserController extends Controller
     public function show(User $user): Response
     {
         $user->loadCount('templates');
+        
+        // Make display_password visible for this response
+        $user->makeVisible(['display_password']);
         
         return Inertia::render('Users/Show', [
             'user' => $user

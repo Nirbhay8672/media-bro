@@ -40,6 +40,22 @@
                 <p class="text-sm text-gray-900 dark:text-white">{{ user.mobile || 'Not set' }}</p>
               </div>
               <div>
+                <label class="text-sm font-medium text-gray-500 dark:text-gray-400">Password</label>
+                <div class="flex items-center justify-between">
+                  <p class="text-sm text-gray-900 dark:text-white font-mono">
+                    {{ showPassword ? (user.display_password || 'Not set') : '••••••••' }}
+                  </p>
+                  <button
+                    type="button"
+                    @click="showPassword = !showPassword"
+                    class="ml-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                  >
+                    <Eye v-if="!showPassword" class="h-4 w-4" />
+                    <EyeOff v-else class="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+              <div>
                 <label class="text-sm font-medium text-gray-500 dark:text-gray-400">Role</label>
                 <div class="mt-1">
                   <span
@@ -49,14 +65,6 @@
                     {{ user.role.replace('_', ' ').toUpperCase() }}
                   </span>
                 </div>
-              </div>
-              <div>
-                <label class="text-sm font-medium text-gray-500 dark:text-gray-400">Templates Created</label>
-                <p class="text-sm text-gray-900 dark:text-white">
-                  <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
-                    {{ user.templates_count || 0 }} templates
-                  </span>
-                </p>
               </div>
             </div>
           </div>
@@ -77,6 +85,23 @@
                 <p class="text-sm text-gray-500 dark:text-gray-400">No subscription information available</p>
               </div>
             </div>
+            <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4 mt-5">Memory Usage</h3>
+            <div class="space-y-4">
+              <div>
+                <label class="text-sm font-medium text-gray-500 dark:text-gray-400">Total Memory Used</label>
+                <p class="text-sm text-gray-900 dark:text-white font-mono">
+                  {{ formatMemoryUsage(user.memory_usage || 0) }}
+                </p>
+              </div>
+              <div>
+                <label class="text-sm font-medium text-gray-500 dark:text-gray-400">Templates Created</label>
+                <p class="text-sm text-gray-900 dark:text-white">
+                  <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+                    {{ user.templates_count || 0 }} templates
+                  </span>
+                </p>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -85,7 +110,9 @@
 </template>
 
 <script setup lang="ts">
+import { ref } from 'vue';
 import type { User } from '@/types';
+import { Eye, EyeOff } from 'lucide-vue-next';
 
 interface Props {
   isOpen: boolean;
@@ -95,14 +122,35 @@ interface Props {
 const props = defineProps<Props>();
 const emit = defineEmits<{
   close: [];
+  edit: [user: User];
 }>();
+
+// Password visibility state
+const showPassword = ref(false);
 
 const closeModal = () => {
   emit('close');
 };
 
+const editUser = () => {
+  if (props.user) {
+    emit('edit', props.user);
+    emit('close');
+  }
+};
+
 const formatDate = (dateString: string) => {
   return new Date(dateString).toLocaleDateString();
+};
+
+const formatMemoryUsage = (bytes: number) => {
+  if (bytes === 0) return '0 B';
+  
+  const k = 1024;
+  const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 };
 
 const getRoleBadgeClass = (role: string) => {

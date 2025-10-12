@@ -27,6 +27,7 @@ export type AppPageProps<
 };
 
 export interface User {
+    display_password: string;
     id: number;
     name: string;
     email: string;

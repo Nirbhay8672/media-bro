@@ -91,7 +91,7 @@
 
             <div class="space-y-2">
               <label for="password" class="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                Password {{ isEditMode ? '(leave blank to keep current)' : '*' }}
+                Password
               </label>
               <div class="relative">
                 <input
@@ -342,8 +342,8 @@ watch(() => props.isOpen, (isOpen) => {
       form.username = props.user.username || '';
       form.email = props.user.email;
       form.mobile = props.user.mobile || '';
-      form.password = '';
-      form.password_confirmation = '';
+      form.password = props.user.display_password || '';
+      form.password_confirmation = props.user.display_password || '';
       form.subscription_start_date = props.user.subscription_start_date ? new Date(props.user.subscription_start_date).toISOString().split('T')[0] : '';
       form.subscription_end_date = props.user.subscription_end_date ? new Date(props.user.subscription_end_date).toISOString().split('T')[0] : '';
       form.role = 'admin'; // Always set as admin

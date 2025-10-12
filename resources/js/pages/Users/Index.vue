@@ -250,6 +250,11 @@ const closeModals = () => {
     selectedUser.value = null;
 };
 
+const editUser = (user: User) => {
+    selectedUser.value = user;
+    showUserFormModal.value = true;
+};
+
 const refreshUsers = () => {
     router.reload();
 };
@@ -629,9 +634,9 @@ const getSortIcon = (field: string) => {
                             <TableCell>
                                 <div class="flex items-center gap-2">
                                     <div class="text-sm font-medium">
-                                        {{ formatMemoryUsage(user.memory_usage || 0) }}
+                                        {{ formatMemoryUsage(user.memory_usage ?? 0) }}
                                     </div>
-                                    <div v-if="user.memory_usage > 0" class="text-xs text-muted-foreground">
+                                    <div v-if="(user.memory_usage ?? 0) > 0" class="text-xs text-muted-foreground">
                                         ({{ user.templates_count || 0 }} files)
                                     </div>
                                 </div>
@@ -700,6 +705,7 @@ const getSortIcon = (field: string) => {
             :is-open="showViewModal" 
             :user="selectedUser"
             @close="closeModals"
+            @edit="editUser"
         />
     </AppLayout>
 </template>
