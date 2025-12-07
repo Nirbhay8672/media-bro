@@ -14,7 +14,7 @@ import { dashboard } from '@/routes';
 import templates from '@/routes/templates';
 import { type NavItem } from '@/types';
 import { Link, usePage } from '@inertiajs/vue3';
-import { LayoutGrid, Image, Users } from 'lucide-vue-next';
+import { LayoutGrid, Image, File, Users } from 'lucide-vue-next';
 import { computed } from 'vue';
 
 const page = usePage();
@@ -27,12 +27,30 @@ const mainNavItems = computed((): NavItem[] => {
             href: dashboard(),
             icon: LayoutGrid,
         },
-        {
+    ];
+
+    // Get user's template access (default to 'both' for super admins or if not set)
+    const templateAccess = user.value?.role === 'super_admin' 
+        ? 'both' 
+        : (user.value?.template_access || 'both');
+
+    // Add Templates menu item based on template_access
+    if (templateAccess === 'image' || templateAccess === 'both') {
+        items.push({
             title: 'Templates',
             href: templates.index(),
             icon: Image,
-        },
-    ];
+        });
+    }
+
+    // Add PDF Templates menu item based on template_access
+    if (templateAccess === 'pdf' || templateAccess === 'both') {
+        items.push({
+            title: 'PDF Templates',
+            href: '/pdf-templates',
+            icon: File,
+        });
+    }
 
     // Add user management for super admins
     if (user.value?.role === 'super_admin') {

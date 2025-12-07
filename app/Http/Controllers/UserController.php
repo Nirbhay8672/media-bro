@@ -69,6 +69,7 @@ class UserController extends Controller
             'subscription_end_date' => 'required|date|after:subscription_start_date',
             'role' => 'required|in:super_admin,admin,user',
             'template_limit' => 'required|integer|in:-1,5,10,25',
+            'template_access' => 'required|in:image,pdf,both',
         ]);
 
         $user = User::create([
@@ -82,6 +83,7 @@ class UserController extends Controller
             'subscription_end_date' => $request->subscription_end_date,
             'role' => $request->role,
             'template_limit' => $request->template_limit,
+            'template_access' => $request->template_access ?? 'both',
             'is_active' => true, // Default to active, will be updated based on subscription
         ]);
 
@@ -105,6 +107,7 @@ class UserController extends Controller
             'subscription_end_date' => 'required|date|after:subscription_start_date',
             'role' => 'required|in:super_admin,admin,user',
             'template_limit' => 'required|integer|in:-1,5,10,25',
+            'template_access' => 'required|in:image,pdf,both',
         ]);
 
         $updateData = [
@@ -116,6 +119,7 @@ class UserController extends Controller
             'subscription_end_date' => $request->subscription_end_date,
             'role' => $request->role,
             'template_limit' => $request->template_limit,
+            'template_access' => $request->template_access ?? 'both',
         ];
 
         if ($request->filled('password')) {

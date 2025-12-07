@@ -32,6 +32,7 @@ class User extends Authenticatable
         'role',
         'is_active',
         'template_limit',
+        'template_access',
     ];
 
     /**

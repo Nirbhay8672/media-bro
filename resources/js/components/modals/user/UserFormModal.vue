@@ -198,6 +198,44 @@
               </p>
             </div>
 
+            <div class="space-y-2">
+              <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                Template Access *
+              </label>
+              <div class="space-y-2">
+                <label class="flex items-center space-x-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    v-model="form.template_access"
+                    value="both"
+                    class="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600"
+                  />
+                  <span class="text-sm text-gray-700 dark:text-gray-300">Both (Image Template & PDF Template)</span>
+                </label>
+                <label class="flex items-center space-x-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    v-model="form.template_access"
+                    value="image"
+                    class="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600"
+                  />
+                  <span class="text-sm text-gray-700 dark:text-gray-300">Image Template Only</span>
+                </label>
+                <label class="flex items-center space-x-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    v-model="form.template_access"
+                    value="pdf"
+                    class="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600"
+                  />
+                  <span class="text-sm text-gray-700 dark:text-gray-300">PDF Template Only</span>
+                </label>
+              </div>
+              <p v-if="form.errors.template_access" class="text-sm text-red-500">
+                {{ form.errors.template_access }}
+              </p>
+            </div>
+
           </div>
 
           <div class="flex justify-end gap-4 pt-6 border-t border-gray-200 dark:border-gray-600">
@@ -258,6 +296,7 @@ const form = useForm({
   subscription_end_date: '',
   role: 'admin' as 'super_admin' | 'admin' | 'user',
   template_limit: -1,
+  template_access: 'both' as 'image' | 'pdf' | 'both',
 });
 
 const closeModal = () => {
@@ -348,6 +387,7 @@ watch(() => props.isOpen, (isOpen) => {
       form.subscription_end_date = props.user.subscription_end_date ? new Date(props.user.subscription_end_date).toISOString().split('T')[0] : '';
       form.role = 'admin'; // Always set as admin
       form.template_limit = props.user.template_limit || -1;
+      form.template_access = props.user.template_access || 'both';
     } else {
       // Create mode - reset form
       form.reset();

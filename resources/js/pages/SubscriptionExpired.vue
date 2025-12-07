@@ -33,9 +33,11 @@
                 <div class="flex justify-center">
                     <button 
                         @click="logout" 
-                        class="bg-red-500 hover:bg-red-600 text-white font-medium py-3 px-8 rounded-lg transition-colors"
+                        :disabled="isLoggingOut"
+                        class="bg-red-500 hover:bg-red-600 disabled:bg-red-400 disabled:cursor-not-allowed text-white font-medium py-3 px-8 rounded-lg transition-colors flex items-center gap-2"
                     >
-                        Logout
+                        <Loader2 v-if="isLoggingOut" class="h-4 w-4 animate-spin" />
+                        {{ isLoggingOut ? 'Logging out...' : 'Logout' }}
                     </button>
                 </div>
             </div>
@@ -44,11 +46,13 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { ref, computed } from 'vue'
 import { usePage, router } from '@inertiajs/vue3'
+import { Loader2 } from 'lucide-vue-next'
 
 const page = usePage()
 const user = computed(() => page.props.auth?.user)
+const isLoggingOut = ref(false)
 
 const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
@@ -59,6 +63,7 @@ const formatDate = (dateString: string) => {
 }
 
 const logout = () => {
+    isLoggingOut.value = true
     router.post('/logout')
 }
 </script>

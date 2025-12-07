@@ -1,20 +1,9 @@
 <script setup lang="ts">
-import Breadcrumbs from '@/components/Breadcrumbs.vue';
 import NavbarUser from '@/components/NavbarUser.vue';
 import { SidebarTrigger } from '@/components/ui/sidebar';
-import type { BreadcrumbItemType } from '@/types';
 import { useAssets } from '@/composables/useAssets';
 
 const { getLogoUrl } = useAssets();
-
-withDefaults(
-    defineProps<{
-        breadcrumbs?: BreadcrumbItemType[];
-    }>(),
-    {
-        breadcrumbs: () => [],
-    },
-);
 </script>
 
 <template>
@@ -35,12 +24,6 @@ withDefaults(
                     <h1 class="text-lg font-bold">Media Bro</h1>
                 </div>
             </div>
-            
-            <div class="h-6 w-px bg-slate-600 dark:bg-gray-500"></div>
-            
-            <template v-if="breadcrumbs && breadcrumbs.length > 0">
-                <Breadcrumbs :breadcrumbs="breadcrumbs" />
-            </template>
         </div>
         
         <!-- Right side of header -->

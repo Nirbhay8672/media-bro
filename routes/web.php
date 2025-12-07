@@ -120,6 +120,11 @@ Route::middleware(['auth', 'verified', 'subscription'])->group(function () {
     
     // Additional template routes
     Route::post('template/{token}/generate', [TemplateController::class, 'generate'])->name('template.generate');
+    
+    // PDF Template routes
+    Route::get('pdf-templates', [App\Http\Controllers\PdfTemplateController::class, 'index'])->name('pdf-templates.index');
+    Route::post('pdf-templates/upload-excel', [App\Http\Controllers\PdfTemplateController::class, 'uploadExcel'])->name('pdf-templates.upload-excel');
+    Route::post('pdf-templates/generate', [App\Http\Controllers\PdfTemplateController::class, 'generatePdfs'])->name('pdf-templates.generate');
 });
 
 // ============================================================================

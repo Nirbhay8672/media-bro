@@ -13,7 +13,7 @@ const breadcrumbs: BreadcrumbItem[] = [
         href: dashboard().url,
     },
     {
-        title: 'Templates',
+        title: 'Image Template',
         href: templates.index().url,
     },
 ];
@@ -192,13 +192,13 @@ const showCopyError = () => {
 </script>
 
 <template>
-    <Head title="Templates" />
+    <Head title="Image Template" />
 
     <AppLayout :breadcrumbs="breadcrumbs">
         <div class="flex h-full flex-1 flex-col gap-4 overflow-x-auto rounded-xl p-4">
             <div class="flex items-center justify-between">
                 <div>
-                    <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Templates</h1>
+                    <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Image Template</h1>
                     <p class="text-gray-600 dark:text-gray-400">Manage your image templates</p>
                 </div>
                 <Link
