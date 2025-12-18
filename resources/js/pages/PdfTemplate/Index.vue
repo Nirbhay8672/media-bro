@@ -49,7 +49,27 @@ const template = ref<{
     name: '',
     width: A4_WIDTH, // A4 width in mm (fixed)
     height: A4_HEIGHT, // A4 height in mm (fixed)
-    pages: [{ id: '1', fields: [] }], // Start with one page
+    pages: [{ 
+        id: '1', 
+        fields: [
+            {
+                id: 'default-1',
+                x: 10,
+                y: 10,
+                width: 100,
+                height: 30,
+                label: 'Name',
+                column: 'name',
+                fontSize: 20,
+                textAlign: 'center',
+                fontFamily: 'Helvetica',
+                fontColor: '#ffffff',
+                fontWeight: 'bold',
+                fontStyle: 'normal',
+                textDecoration: 'none',
+            }
+        ] 
+    }], // Start with one page with default field
 });
 
 const excelData = ref<any[]>([]);
@@ -568,15 +588,15 @@ watch(showEditFieldDialog, (isOpen) => {
                                                 'text-sm font-semibold transition-colors',
                                                 selectedField?.id === field.id 
                                                     ? 'text-blue-700' 
-                                                    : 'text-white group-hover:text-blue-600'
+                                                    : 'text-gray-900 group-hover:text-blue-600'
                                             ]">
                                                 {{ field.label || field.column }}
                                             </span>
                                             <span v-if="field.label && field.column" :class="[
                                                 'text-xs mt-0.5 transition-colors',
                                                 selectedField?.id === field.id 
-                                                    ? 'text-gray-500' 
-                                                    : 'text-gray-300 group-hover:text-black'
+                                                    ? 'text-gray-600' 
+                                                    : 'text-gray-600 group-hover:text-gray-800'
                                             ]">
                                                 Column: {{ field.column }}
                                             </span>
