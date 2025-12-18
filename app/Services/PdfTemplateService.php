@@ -5,6 +5,7 @@ namespace App\Services;
 use Dompdf\Dompdf;
 use Dompdf\Options;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
 
@@ -54,28 +55,331 @@ class PdfTemplateService
         return $data;
     }
 
-    public function generatePdfsFromTemplate(array $template, array $excelData, array $columnMapping): array
+    public function uploadPdfFile(UploadedFile $file): array
+    {
+        // Store the PDF file
+        $filename = 'pdf-templates/' . uniqid() . '_' . time() . '.pdf';
+        $path = $file->storeAs('pdf-templates', basename($filename), 'public');
+        
+        // Get PDF dimensions
+        $dimensions = $this->getPdfDimensions(storage_path('app/public/' . $path));
+        
+        return [
+            'file_path' => $path,
+            'file_url' => Storage::url($path),
+            'dimensions' => $dimensions,
+        ];
+    }
+
+    protected function getPdfDimensions(string $pdfPath): array
+    {
+        // Try to get dimensions from PDF using a simple method
+        // For now, default to A4 - dimensions will be adjusted when PDF is displayed
+        // The actual dimensions will be detected from the uploaded PDF in the frontend
+        return [
+            'width' => 210,  // A4 width in mm
+            'height' => 297, // A4 height in mm
+        ];
+    }
+
+    public function generatePdfsFromTemplate(array $template, array $excelData, array $columnMapping, ?string $pdfFilePath = null, ?string $pdfPageImage = null): array
     {
         $pdfPreviews = [];
         $templateName = $template['name'] ?? 'template';
         $pages = $template['pages'] ?? [];
 
-        foreach ($excelData as $index => $row) {
-            $html = $this->buildHtmlFromTemplate($template, $row, $columnMapping, $pages);
-            $timestamp = date('Y-m-d_H-i-s');
-            $filename = 'bromi_' . $templateName . '_' . ($index + 1) . '_' . $timestamp . '.pdf';
+        // If PDF file is provided, use overlay method; otherwise use HTML generation
+        if ($pdfFilePath && Storage::disk('public')->exists($pdfFilePath)) {
+            foreach ($excelData as $index => $row) {
+                $timestamp = date('Y-m-d_H-i-s');
+                $filename = 'bromi_' . $templateName . '_' . ($index + 1) . '_' . $timestamp . '.pdf';
+                
+                $binary = $this->overlayFieldsOnPdf(
+                    storage_path('app/public/' . $pdfFilePath),
+                    $pages,
+                    $row,
+                    $columnMapping,
+                    $pdfPageImage
+                );
 
-            $binary = $this->generatePdfBinaryFromHtml($html, $template);
+                $pdfPreviews[] = [
+                    'filename' => $filename,
+                    'index' => $index + 1,
+                    'base64' => base64_encode($binary),
+                ];
+            }
+        } else {
+            // Original HTML-based generation
+            foreach ($excelData as $index => $row) {
+                $html = $this->buildHtmlFromTemplate($template, $row, $columnMapping, $pages);
+                $timestamp = date('Y-m-d_H-i-s');
+                $filename = 'bromi_' . $templateName . '_' . ($index + 1) . '_' . $timestamp . '.pdf';
 
-            $pdfPreviews[] = [
-                'filename' => $filename,
-                'index' => $index + 1,
-                'base64' => base64_encode($binary),
-            ];
+                $binary = $this->generatePdfBinaryFromHtml($html, $template);
+
+                $pdfPreviews[] = [
+                    'filename' => $filename,
+                    'index' => $index + 1,
+                    'base64' => base64_encode($binary),
+                ];
+            }
         }
 
         return $pdfPreviews;
     }
+
+    protected function overlayFieldsOnPdf(string $pdfPath, array $pages, array $rowData, array $columnMapping, ?string $pdfPageImageBase64 = null): string
+    {
+        // Use the base64 image from frontend if available, otherwise try to convert
+        $pdfImageUrl = null;
+        
+        if ($pdfPageImageBase64) {
+            // Use the base64 image directly
+            $pdfImageUrl = $pdfPageImageBase64;
+        } else {
+            // Fallback: try to convert PDF to image using server tools
+            $pdfImageUrl = $this->convertPdfToImage($pdfPath);
+            
+            // If conversion failed, try using PDF file URL (may not work)
+            if (!$pdfImageUrl) {
+                if (strpos($pdfPath, storage_path('app/public/')) !== false) {
+                    $relativePath = str_replace(storage_path('app/public/'), '', $pdfPath);
+                    $pdfImageUrl = Storage::url($relativePath);
+                }
+            }
+        }
+        
+        // Get fields from first page
+        $fields = $pages[0]['fields'] ?? [];
+        $template = ['width' => 210, 'height' => 297]; // Default A4
+        
+        // Build HTML with PDF image as background and fields overlaid
+        $html = $this->buildHtmlWithPdfImageBackground($template, $pdfImageUrl, null, $fields, $rowData, $columnMapping);
+        
+        // Generate PDF from HTML using DomPDF
+        return $this->generatePdfBinaryFromHtml($html, $template);
+    }
+    
+    protected function convertPdfToImage(string $pdfPath): ?string
+    {
+        // Try to convert PDF first page to image using available tools
+        // Method 1: Try Ghostscript (gs command)
+        if ($this->commandExists('gs')) {
+            $imagePath = storage_path('app/public/pdf-templates/' . uniqid() . '_page1.png');
+            $dir = dirname($imagePath);
+            if (!file_exists($dir)) {
+                mkdir($dir, 0755, true);
+            }
+            
+            $command = sprintf(
+                'gs -dNOPAUSE -dBATCH -sDEVICE=png16m -r300 -dFirstPage=1 -dLastPage=1 -sOutputFile=%s %s 2>&1',
+                escapeshellarg($imagePath),
+                escapeshellarg($pdfPath)
+            );
+            
+            exec($command, $output, $returnCode);
+            
+            if ($returnCode === 0 && file_exists($imagePath)) {
+                return Storage::url(str_replace(storage_path('app/public/'), '', $imagePath));
+            }
+        }
+        
+        // Method 2: Try pdftoppm (poppler-utils)
+        if ($this->commandExists('pdftoppm')) {
+            $imagePath = storage_path('app/public/pdf-templates/' . uniqid() . '_page1.png');
+            $dir = dirname($imagePath);
+            if (!file_exists($dir)) {
+                mkdir($dir, 0755, true);
+            }
+            
+            $command = sprintf(
+                'pdftoppm -png -f 1 -l 1 -r 300 %s %s 2>&1',
+                escapeshellarg($pdfPath),
+                escapeshellarg($imagePath)
+            );
+            
+            exec($command, $output, $returnCode);
+            
+            // pdftoppm creates files with -1 suffix
+            $actualImagePath = $imagePath . '-1.png';
+            if ($returnCode === 0 && file_exists($actualImagePath)) {
+                // Rename to remove suffix
+                rename($actualImagePath, $imagePath);
+                return Storage::url(str_replace(storage_path('app/public/'), '', $imagePath));
+            }
+        }
+        
+        // If no conversion tool available, return null (will use PDF URL directly)
+        \Log::warning('No PDF to image conversion tool available. PDF background may not be included.');
+        return null;
+    }
+    
+    protected function commandExists(string $command): bool
+    {
+        $whereIsCommand = (PHP_OS === 'WINNT') ? 'where' : 'which';
+        $process = proc_open(
+            "$whereIsCommand $command",
+            [
+                0 => ['pipe', 'r'],
+                1 => ['pipe', 'w'],
+                2 => ['pipe', 'w'],
+            ],
+            $pipes
+        );
+        
+        if ($process !== false) {
+            $stdout = stream_get_contents($pipes[1]);
+            $returnCode = proc_close($process);
+            return $returnCode === 0 && !empty($stdout);
+        }
+        
+        return false;
+    }
+    
+    protected function buildHtmlWithPdfImageBackground(array $template, ?string $pdfImageUrl, ?string $pdfFileUrl, array $fields, array $rowData, array $columnMapping): string
+    {
+        $width = $template['width'] ?? 210;
+        $height = $template['height'] ?? 297;
+        
+        // Get PDF image URL or use PDF file URL as fallback
+        $backgroundUrl = $pdfImageUrl;
+        if (!$backgroundUrl && $pdfFileUrl) {
+            // Fallback: use PDF file URL (DomPDF may not render it, but we try)
+            $backgroundUrl = asset($pdfFileUrl);
+        }
+        
+        $html = '<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: Arial, sans-serif;
+        }
+        .page {
+            width: ' . $width . 'mm;
+            height: ' . $height . 'mm;
+            position: relative;
+            background: white;
+            overflow: hidden;
+        }
+        .pdf-background {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+            object-fit: contain;
+        }
+        .field {
+            position: absolute;
+            box-sizing: border-box;
+            display: block;
+            z-index: 2;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            overflow: visible;
+            background: transparent;
+        }
+    </style>
+</head>
+<body>
+    <div class="page">
+';
+        
+        // Add PDF background image if available
+        if ($backgroundUrl) {
+            // Check if it's a base64 data URI
+            if (strpos($backgroundUrl, 'data:image') === 0) {
+                // Use base64 data URI directly
+                $html .= '<img class="pdf-background" src="' . htmlspecialchars($backgroundUrl, ENT_QUOTES, 'UTF-8') . '" alt="PDF Background" />';
+            } else {
+                // Use absolute URL for DomPDF
+                $absoluteUrl = $backgroundUrl;
+                if (!preg_match('/^https?:\/\//', $absoluteUrl)) {
+                    // Convert relative URL to absolute
+                    $absoluteUrl = url($backgroundUrl);
+                }
+                $html .= '<img class="pdf-background" src="' . htmlspecialchars($absoluteUrl, ENT_QUOTES, 'UTF-8') . '" alt="PDF Background" />';
+            }
+        }
+        
+        // Add fields
+        foreach ($fields as $field) {
+            $columnName = $field['column'] ?? '';
+            $value = '';
+            
+            // Get value from row data using column mapping
+            if (!empty($columnName) && isset($columnMapping[$columnName])) {
+                $excelColumnName = $columnMapping[$columnName];
+                if (isset($rowData[$excelColumnName])) {
+                    $cellValue = $rowData[$excelColumnName];
+                    if (is_array($cellValue)) {
+                        $cellValue = implode(', ', array_filter($cellValue, function($item) {
+                            return !is_array($item) && !is_object($item);
+                        }));
+                    } elseif (is_object($cellValue)) {
+                        $cellValue = json_encode($cellValue);
+                    }
+                    $value = $cellValue !== null && $cellValue !== '' ? (string)$cellValue : '';
+                    $value = htmlspecialchars($value, ENT_QUOTES, 'UTF-8');
+                }
+            }
+            
+            if (empty($value)) {
+                continue;
+            }
+            
+            $x = $field['x'] ?? 0;
+            $y = $field['y'] ?? 0;
+            $width = $field['width'] ?? 100;
+            $height = $field['height'] ?? 20;
+            $fontSize = $field['fontSize'] ?? 12;
+            $textAlign = $field['textAlign'] ?? 'left';
+            $fontFamily = $field['fontFamily'] ?? 'Arial';
+            $fontColor = $field['fontColor'] ?? '#000000';
+            $fontWeight = $field['fontWeight'] ?? 'normal';
+            $fontStyle = $field['fontStyle'] ?? 'normal';
+            $textDecoration = $field['textDecoration'] ?? 'none';
+            
+            $style = sprintf(
+                'left: %smm; top: %smm; width: %smm; min-height: %smm; font-size: %spx; text-align: %s; padding: 2mm; overflow: visible; word-wrap: break-word; font-family: %s; color: %s; font-weight: %s; font-style: %s; text-decoration: %s;',
+                $x,
+                $y,
+                $width,
+                $height,
+                $fontSize,
+                $textAlign,
+                htmlspecialchars($fontFamily, ENT_QUOTES, 'UTF-8'),
+                htmlspecialchars($fontColor, ENT_QUOTES, 'UTF-8'),
+                htmlspecialchars($fontWeight, ENT_QUOTES, 'UTF-8'),
+                htmlspecialchars($fontStyle, ENT_QUOTES, 'UTF-8'),
+                htmlspecialchars($textDecoration, ENT_QUOTES, 'UTF-8')
+            );
+            
+            $html .= sprintf(
+                '<div class="field" style="%s">%s</div>',
+                $style,
+                $value
+            );
+        }
+        
+        $html .= '
+    </div>
+</body>
+</html>';
+        
+        return $html;
+    }
+
 
     protected function buildHtmlFromTemplate(array $template, array $rowData, array $columnMapping, array $pages = []): string
     {
@@ -214,7 +518,8 @@ class PdfTemplateService
         
         $options = new Options();
         $options->set('isHtml5ParserEnabled', true);
-        $options->set('isRemoteEnabled', true);
+        $options->set('isRemoteEnabled', true); // Enable remote images
+        $options->set('isPhpEnabled', true);
         $options->set('defaultPaperSize', 'a4'); // Use A4 paper size
         $options->set('defaultPaperWidth', $width . 'mm');
         $options->set('defaultPaperHeight', $height . 'mm');

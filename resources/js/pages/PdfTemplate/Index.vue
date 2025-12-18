@@ -4,9 +4,10 @@ import { Head } from '@inertiajs/vue3';
 import { ref, computed, watch } from 'vue';
 import PdfTemplateBuilder from '@/components/PdfTemplate/PdfTemplateBuilder.vue';
 import ExcelUploader from '@/components/PdfTemplate/ExcelUploader.vue';
+import PdfUploader from '@/components/PdfTemplate/PdfUploader.vue';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { X, Plus, Pencil, Eye } from 'lucide-vue-next';
@@ -62,6 +63,9 @@ const showEditFieldDialog = ref(false);
 const showExcelViewModal = ref(false);
 const selectedField = ref<Field | null>(null);
 const editingField = ref<Field | null>(null);
+const uploadedPdfUrl = ref<string>('');
+const uploadedPdfPath = ref<string>('');
+const pdfPageImageBase64 = ref<string>('');
 const fieldForm = ref({
     label: '',
     column: '',
@@ -111,6 +115,21 @@ const switchPage = (pageIndex: number) => {
 
 const handleTemplateUpdate = (updatedTemplate: any) => {
     template.value = { ...updatedTemplate };
+};
+
+const handlePdfUpload = (data: any) => {
+    uploadedPdfUrl.value = data.file_url || '';
+    uploadedPdfPath.value = data.file_path || '';
+    
+    // Update template dimensions based on uploaded PDF
+    if (data.dimensions) {
+        template.value.width = data.dimensions.width || A4_WIDTH;
+        template.value.height = data.dimensions.height || A4_HEIGHT;
+    }
+};
+
+const handlePdfImageConverted = (base64: string) => {
+    pdfPageImageBase64.value = base64;
 };
 
 const handleExcelUpload = (data: any) => {
@@ -202,6 +221,8 @@ const generatePdfs = async () => {
             template: template.value,
             excel_data: excelData.value,
             column_mapping: columnMapping.value,
+            pdf_file_path: uploadedPdfPath.value || null,
+            pdf_page_image: pdfPageImageBase64.value || null,
         });
 
         generatedPdfs.value = response.data.pdfs || [];
@@ -442,22 +463,22 @@ watch(showEditFieldDialog, (isOpen) => {
                                         </DialogHeader>
                                         <div class="space-y-4 py-4">
                                             <div>
-                                                <Label>Label</Label>
+                                                <Label class="mb-2 block text-sm font-medium">Label</Label>
                                                 <Input v-model="fieldForm.label" placeholder="e.g., Guest Name" />
                                             </div>
                                             <div>
-                                                <Label>Column Name</Label>
+                                                <Label class="mb-2 block text-sm font-medium">Column Name</Label>
                                                 <Input v-model="fieldForm.column" placeholder="e.g., name" />
                                             </div>
                                             <div>
-                                                <Label>Font Size</Label>
-                                                <Input v-model.number="fieldForm.fontSize" type="number" />
+                                                <Label class="mb-2 block text-sm font-medium">Font Size</Label>
+                                                <Input v-model.number="fieldForm.fontSize" type="number" min="8" max="72" />
                                             </div>
                                             <div>
-                                                <Label>Text Align</Label>
+                                                <Label class="mb-2 block text-sm font-medium">Text Align</Label>
                                                 <select
                                                     v-model="fieldForm.textAlign"
-                                                    class="w-full rounded-md border border-input bg-background px-3 py-2"
+                                                    class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs transition-[color,box-shadow] outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] disabled:cursor-not-allowed disabled:opacity-50"
                                                 >
                                                     <option value="left">Left</option>
                                                     <option value="center">Center</option>
@@ -465,10 +486,10 @@ watch(showEditFieldDialog, (isOpen) => {
                                                 </select>
                                             </div>
                                             <div>
-                                                <Label>Font Family</Label>
+                                                <Label class="mb-2 block text-sm font-medium">Font Family</Label>
                                                 <select
                                                     v-model="fieldForm.fontFamily"
-                                                    class="w-full rounded-md border border-input bg-background px-3 py-2"
+                                                    class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs transition-[color,box-shadow] outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] disabled:cursor-not-allowed disabled:opacity-50"
                                                 >
                                                     <option value="Arial">Arial</option>
                                                     <option value="Times New Roman">Times New Roman</option>
@@ -480,25 +501,28 @@ watch(showEditFieldDialog, (isOpen) => {
                                                 </select>
                                             </div>
                                             <div>
-                                                <Label>Font Color</Label>
-                                                <Input v-model="fieldForm.fontColor" type="color" class="h-10" />
+                                                <Label class="mb-2 block text-sm font-medium">Font Color</Label>
+                                                <div class="flex items-center gap-2">
+                                                    <Input v-model="fieldForm.fontColor" type="color" class="h-9 w-20 cursor-pointer" />
+                                                    <Input v-model="fieldForm.fontColor" type="text" placeholder="#000000" class="flex-1" />
+                                                </div>
                                             </div>
-                                            <div class="grid grid-cols-2 gap-2">
+                                            <div class="grid grid-cols-2 gap-4">
                                                 <div>
-                                                    <Label>Font Weight</Label>
+                                                    <Label class="mb-2 block text-sm font-medium">Font Weight</Label>
                                                     <select
                                                         v-model="fieldForm.fontWeight"
-                                                        class="w-full rounded-md border border-input bg-background px-3 py-2"
+                                                        class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs transition-[color,box-shadow] outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] disabled:cursor-not-allowed disabled:opacity-50"
                                                     >
                                                         <option value="normal">Normal</option>
                                                         <option value="bold">Bold</option>
                                                     </select>
                                                 </div>
                                                 <div>
-                                                    <Label>Font Style</Label>
+                                                    <Label class="mb-2 block text-sm font-medium">Font Style</Label>
                                                     <select
                                                         v-model="fieldForm.fontStyle"
-                                                        class="w-full rounded-md border border-input bg-background px-3 py-2"
+                                                        class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs transition-[color,box-shadow] outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] disabled:cursor-not-allowed disabled:opacity-50"
                                                     >
                                                         <option value="normal">Normal</option>
                                                         <option value="italic">Italic</option>
@@ -506,23 +530,25 @@ watch(showEditFieldDialog, (isOpen) => {
                                                 </div>
                                             </div>
                                             <div>
-                                                <Label>Text Decoration</Label>
+                                                <Label class="mb-2 block text-sm font-medium">Text Decoration</Label>
                                                 <select
                                                     v-model="fieldForm.textDecoration"
-                                                    class="w-full rounded-md border border-input bg-background px-3 py-2"
+                                                    class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs transition-[color,box-shadow] outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] disabled:cursor-not-allowed disabled:opacity-50"
                                                 >
                                                     <option value="none">None</option>
                                                     <option value="underline">Underline</option>
                                                 </select>
                                             </div>
+                                        </div>
+                                        <DialogFooter>
                                             <Button 
                                                 @click="addField" 
-                                                class="w-full"
+                                                class="w-full sm:w-auto"
                                                 :disabled="!canAddField"
                                             >
                                                 Add Field
                                             </Button>
-                                        </div>
+                                        </DialogFooter>
                                     </DialogContent>
                                 </Dialog>
                             </div>
@@ -577,6 +603,16 @@ watch(showEditFieldDialog, (isOpen) => {
                                     No fields yet. Click "Add Field" to create one.
                                 </p>
                             </div>
+                        </div>
+
+                        <!-- Upload PDF Section -->
+                        <div class="border-t pt-4">
+                            <Label class="text-base font-semibold mb-3 block">Upload PDF Template</Label>
+                            <PdfUploader
+                                @uploaded="handlePdfUpload"
+                                :pdf-url="uploadedPdfUrl"
+                                :no-card="true"
+                            />
                         </div>
 
                         <!-- Upload Excel Section -->
@@ -704,11 +740,13 @@ watch(showEditFieldDialog, (isOpen) => {
                         }"
                         :show-only-canvas="true"
                         :selected-field-id="selectedField?.id || null"
+                        :pdf-background-url="uploadedPdfUrl"
                         @update="(updatedTemplate) => {
                             currentPage.fields = updatedTemplate.fields;
                             handleTemplateUpdate(template);
                         }"
                         @field-selected="selectField"
+                        @pdf-image-converted="handlePdfImageConverted"
                     />
                 </div>
             </div>

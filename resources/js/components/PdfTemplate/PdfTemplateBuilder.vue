@@ -7,6 +7,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { X, Plus, GripVertical } from 'lucide-vue-next';
 
+// PDF.js types
+declare global {
+    interface Window {
+        pdfjsLib: any;
+    }
+}
+
 interface Field {
     id: string;
     x: number;
@@ -33,16 +40,21 @@ interface Props {
     };
     showOnlyCanvas?: boolean;
     selectedFieldId?: string | null;
+    pdfBackgroundUrl?: string;
 }
 
 const props = defineProps<Props>();
 const emit = defineEmits<{
     update: [template: Props['template']];
     fieldSelected: [field: Field | null];
+    pdfImageConverted: [base64: string];
 }>();
 
 const canvasRef = ref<HTMLElement | null>(null);
 const selectedField = ref<Field | null>(null);
+const pdfCanvasRef = ref<HTMLCanvasElement | null>(null);
+const pdfLoading = ref(false);
+const pdfError = ref<string | null>(null);
 
 // Watch for external selection changes
 watch(() => props.selectedFieldId, (newId) => {
@@ -295,10 +307,152 @@ const startResize = (e: MouseEvent, handle: string) => {
     }
 };
 
+// Load and render PDF
+const loadPdf = async () => {
+    console.log('loadPdf called', { url: props.pdfBackgroundUrl, hasCanvas: !!pdfCanvasRef.value });
+    
+    if (!props.pdfBackgroundUrl) {
+        console.warn('No PDF URL provided');
+        return;
+    }
+    
+    if (!pdfCanvasRef.value) {
+        console.warn('Canvas ref not available');
+        return;
+    }
+    
+    pdfLoading.value = true;
+    pdfError.value = null;
+    
+    try {
+        // Load PDF.js from CDN if not already loaded
+        if (!window.pdfjsLib) {
+            console.log('Loading PDF.js from CDN...');
+            await new Promise((resolve, reject) => {
+                const script = document.createElement('script');
+                script.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+                script.onload = () => {
+                    window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+                    console.log('PDF.js loaded successfully');
+                    resolve(true);
+                };
+                script.onerror = () => {
+                    console.error('Failed to load PDF.js script');
+                    reject(new Error('Failed to load PDF.js'));
+                };
+                document.head.appendChild(script);
+            });
+        }
+        await renderPdf();
+    } catch (error: any) {
+        console.error('PDF load error:', error);
+        pdfError.value = 'Failed to load PDF: ' + (error.message || 'Unknown error');
+        pdfLoading.value = false;
+    }
+};
+
+const renderPdf = async () => {
+    if (!props.pdfBackgroundUrl || !pdfCanvasRef.value || !window.pdfjsLib) {
+        console.warn('Cannot render PDF:', { 
+            hasUrl: !!props.pdfBackgroundUrl, 
+            hasCanvas: !!pdfCanvasRef.value, 
+            hasPdfJs: !!window.pdfjsLib 
+        });
+        return;
+    }
+    
+    try {
+        console.log('Rendering PDF:', props.pdfBackgroundUrl);
+        const loadingTask = window.pdfjsLib.getDocument({
+            url: props.pdfBackgroundUrl,
+            withCredentials: false
+        });
+        const pdf = await loadingTask.promise;
+        console.log('PDF loaded, pages:', pdf.numPages);
+        
+        // Get first page only (single page requirement)
+        const page = await pdf.getPage(1);
+        const viewport = page.getViewport({ scale: 1.0 });
+        console.log('Page viewport:', viewport);
+        
+        const canvas = pdfCanvasRef.value;
+        const context = canvas.getContext('2d');
+        
+        if (!context) {
+            throw new Error('Could not get canvas context');
+        }
+        
+        // Set canvas size to match template dimensions (in pixels)
+        const mmToPx = 3.779527559;
+        const templateWidthPx = props.template.width * mmToPx * scale.value;
+        const templateHeightPx = props.template.height * mmToPx * scale.value;
+        
+        // Calculate scale to fit PDF in canvas while maintaining aspect ratio
+        const scaleX = templateWidthPx / viewport.width;
+        const scaleY = templateHeightPx / viewport.height;
+        const fitScale = Math.min(scaleX, scaleY);
+        
+        const scaledViewport = page.getViewport({ scale: fitScale });
+        
+        canvas.width = scaledViewport.width;
+        canvas.height = scaledViewport.height;
+        
+        console.log('Canvas size:', canvas.width, canvas.height);
+        
+        const renderContext = {
+            canvasContext: context,
+            viewport: scaledViewport
+        };
+        
+        await page.render(renderContext).promise;
+        console.log('PDF rendered successfully');
+        
+        // Convert canvas to base64 image for backend use
+        const imageData = canvas.toDataURL('image/png');
+        emit('pdfImageConverted', imageData);
+        
+        pdfLoading.value = false;
+    } catch (error: any) {
+        console.error('PDF render error:', error);
+        pdfError.value = 'Failed to render PDF: ' + (error.message || 'Unknown error');
+        pdfLoading.value = false;
+    }
+};
+
+// Watch for PDF URL changes
+watch(() => props.pdfBackgroundUrl, (newUrl) => {
+    console.log('PDF URL changed:', newUrl);
+    if (newUrl) {
+        // Wait for next tick to ensure canvas is rendered
+        setTimeout(() => {
+            if (pdfCanvasRef.value) {
+                loadPdf();
+            } else {
+                console.warn('PDF canvas ref not available yet');
+            }
+        }, 200);
+    }
+}, { immediate: true });
+
+// Watch for scale changes to re-render PDF
+watch(scale, () => {
+    if (props.pdfBackgroundUrl && pdfCanvasRef.value) {
+        loadPdf();
+    }
+});
+
 onMounted(() => {
     document.addEventListener('mousemove', onMouseMove);
     document.addEventListener('mouseup', stopDrag);
     document.addEventListener('mouseleave', stopDrag);
+    
+    // Wait for canvas to be rendered, then load PDF if URL is available
+    setTimeout(() => {
+        if (props.pdfBackgroundUrl && pdfCanvasRef.value) {
+            console.log('Mounting with PDF URL:', props.pdfBackgroundUrl);
+            loadPdf();
+        }
+    }, 300);
 });
 
 const stopDrag = () => {
@@ -555,16 +709,38 @@ const updateFieldProperty = (field: Field, property: keyof Field, value: any) =>
                                  minHeight: scaledHeight + 'px',
                                  aspectRatio: (props.template.width / props.template.height).toString(),
                              }">
+                            <!-- PDF Background Canvas -->
+                            <canvas
+                                v-if="props.pdfBackgroundUrl"
+                                ref="pdfCanvasRef"
+                                class="absolute inset-0 w-full h-full pointer-events-none"
+                                style="z-index: 1; object-fit: contain;"
+                            />
+                            <div
+                                v-if="pdfLoading"
+                                class="absolute inset-0 flex items-center justify-center bg-gray-100"
+                                style="z-index: 1;"
+                            >
+                                <span class="text-sm text-gray-500">Loading PDF...</span>
+                            </div>
+                            <div
+                                v-if="pdfError"
+                                class="absolute inset-0 flex items-center justify-center bg-red-50"
+                                style="z-index: 1;"
+                            >
+                                <span class="text-sm text-red-500">{{ pdfError }}</span>
+                            </div>
                             <div
                                 v-for="field in fields"
                                 :key="field.id"
                                 :class="[
                                     'absolute border-2 cursor-move select-none',
                                     selectedField?.id === field.id 
-                                        ? 'border-blue-600 bg-blue-200 shadow-lg z-20' 
-                                        : 'border-blue-400 bg-blue-100 z-10'
+                                        ? 'border-blue-600 bg-blue-200 shadow-lg' 
+                                        : 'border-blue-400 bg-blue-100',
+                                    props.pdfBackgroundUrl ? 'bg-opacity-80' : ''
                                 ]"
-                                :style="getFieldStyle(field)"
+                                :style="{ ...getFieldStyle(field), zIndex: selectedField?.id === field.id ? 30 : 20 }"
                                 @mousedown.prevent="startDrag($event, field)"
                                 @click.stop="selectField(field)"
                             >
@@ -624,16 +800,38 @@ const updateFieldProperty = (field: Field, property: keyof Field, value: any) =>
                              minHeight: scaledHeight + 'px',
                              aspectRatio: (props.template.width / props.template.height).toString(),
                          }">
+                        <!-- PDF Background Canvas -->
+                        <canvas
+                            v-if="props.pdfBackgroundUrl"
+                            ref="pdfCanvasRef"
+                            class="absolute inset-0 w-full h-full pointer-events-none"
+                            style="z-index: 1; object-fit: contain;"
+                        />
+                        <div
+                            v-if="pdfLoading"
+                            class="absolute inset-0 flex items-center justify-center bg-gray-100"
+                            style="z-index: 1;"
+                        >
+                            <span class="text-sm text-gray-500">Loading PDF...</span>
+                        </div>
+                        <div
+                            v-if="pdfError"
+                            class="absolute inset-0 flex items-center justify-center bg-red-50"
+                            style="z-index: 1;"
+                        >
+                            <span class="text-sm text-red-500">{{ pdfError }}</span>
+                        </div>
                         <div
                             v-for="field in fields"
                             :key="field.id"
                             :class="[
                                 'absolute border-2 cursor-move select-none',
                                 selectedField?.id === field.id 
-                                    ? 'border-blue-600 bg-blue-200 shadow-lg z-20' 
-                                    : 'border-blue-400 bg-blue-100 z-10'
+                                    ? 'border-blue-600 bg-blue-200 shadow-lg' 
+                                    : 'border-blue-400 bg-blue-100',
+                                props.pdfBackgroundUrl ? 'bg-opacity-80' : ''
                             ]"
-                            :style="getFieldStyle(field)"
+                            :style="{ ...getFieldStyle(field), zIndex: selectedField?.id === field.id ? 30 : 20 }"
                             @mousedown.prevent="startDrag($event, field)"
                             @click.stop="selectField(field)"
                         >
