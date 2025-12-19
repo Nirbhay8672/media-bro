@@ -6,6 +6,7 @@ use Dompdf\Dompdf;
 use Dompdf\Options;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Log;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
 
@@ -57,18 +58,50 @@ class PdfTemplateService
 
     public function uploadPdfFile(UploadedFile $file): array
     {
-        // Store the PDF file
-        $filename = 'pdf-templates/' . uniqid() . '_' . time() . '.pdf';
-        $path = $file->storeAs('pdf-templates', basename($filename), 'public');
-        
-        // Get PDF dimensions
-        $dimensions = $this->getPdfDimensions(storage_path('app/public/' . $path));
-        
-        return [
-            'file_path' => $path,
-            'file_url' => Storage::url($path),
-            'dimensions' => $dimensions,
-        ];
+        try {
+            // Ensure the directory exists
+            $directory = 'pdf-templates';
+            $fullPath = storage_path('app/public/' . $directory);
+            
+            if (!file_exists($fullPath)) {
+                mkdir($fullPath, 0755, true);
+            }
+            
+            // Check if directory is writable
+            if (!is_writable($fullPath)) {
+                throw new \Exception('Storage directory is not writable. Please check permissions.');
+            }
+            
+            // Store the PDF file
+            $filename = uniqid() . '_' . time() . '.pdf';
+            $path = $file->storeAs($directory, $filename, 'public');
+            
+            if (!$path) {
+                throw new \Exception('Failed to store the PDF file.');
+            }
+            
+            // Verify file was stored
+            $fullFilePath = storage_path('app/public/' . $path);
+            if (!file_exists($fullFilePath)) {
+                throw new \Exception('File was not saved correctly.');
+            }
+            
+            // Get PDF dimensions
+            $dimensions = $this->getPdfDimensions($fullFilePath);
+            
+            return [
+                'file_path' => $path,
+                'file_url' => Storage::url($path),
+                'dimensions' => $dimensions,
+            ];
+        } catch (\Exception $e) {
+            Log::error('PDF Upload Service Error: ' . $e->getMessage(), [
+                'file_name' => $file->getClientOriginalName(),
+                'file_size' => $file->getSize(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            throw $e;
+        }
     }
 
     protected function getPdfDimensions(string $pdfPath): array
@@ -256,7 +289,7 @@ class PdfTemplateService
         }
         
         // If no conversion tool available, return null (will use PDF URL directly)
-        \Log::warning('No PDF to image conversion tool available. PDF background may not be included.');
+        Log::warning('No PDF to image conversion tool available. PDF background may not be included.');
         return null;
     }
     

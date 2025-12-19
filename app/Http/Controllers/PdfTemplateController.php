@@ -37,19 +37,51 @@ class PdfTemplateController extends Controller
 
     public function uploadPdf(Request $request)
     {
-        $request->validate([
-            'pdf_file' => 'required|mimes:pdf|max:10240',
-        ]);
+        try {
+            $request->validate([
+                'pdf_file' => 'required|mimes:pdf|max:51200', // Increased to 50MB for live environment
+            ], [
+                'pdf_file.required' => 'Please select a PDF file to upload.',
+                'pdf_file.mimes' => 'The file must be a PDF file.',
+                'pdf_file.max' => 'The PDF file size must not exceed 50MB.',
+            ]);
 
-        $file = $request->file('pdf_file');
-        $result = $this->pdfTemplateService->uploadPdfFile($file);
+            $file = $request->file('pdf_file');
+            
+            if (!$file || !$file->isValid()) {
+                return response()->json([
+                    'message' => 'The pdf file failed to upload.',
+                    'errors' => [
+                        'pdf_file' => ['The uploaded file is invalid or corrupted.']
+                    ]
+                ], 422);
+            }
 
-        return response()->json([
-            'success' => true,
-            'file_path' => $result['file_path'],
-            'file_url' => $result['file_url'],
-            'dimensions' => $result['dimensions'],
-        ]);
+            $result = $this->pdfTemplateService->uploadPdfFile($file);
+
+            return response()->json([
+                'success' => true,
+                'file_path' => $result['file_path'],
+                'file_url' => $result['file_url'],
+                'dimensions' => $result['dimensions'],
+            ]);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json([
+                'message' => 'The pdf file failed to upload.',
+                'errors' => $e->errors()
+            ], 422);
+        } catch (\Exception $e) {
+            \Log::error('PDF Upload Error: ' . $e->getMessage(), [
+                'trace' => $e->getTraceAsString()
+            ]);
+            
+            return response()->json([
+                'message' => 'The pdf file failed to upload.',
+                'errors' => [
+                    'pdf_file' => [$e->getMessage() ?: 'An error occurred while uploading the file.']
+                ]
+            ], 422);
+        }
     }
 
     public function generatePdfs(Request $request)
