@@ -59,7 +59,7 @@ class PdfTemplateController extends Controller
             'excel_data' => 'required|array',
             'column_mapping' => 'required|array',
             'pdf_file_path' => 'nullable|string',
-            'pdf_page_image' => 'nullable|string',
+            'pdf_page_image' => 'nullable', // Can be string (single page) or array (multiple pages)
         ]);
 
         $template = $request->input('template');

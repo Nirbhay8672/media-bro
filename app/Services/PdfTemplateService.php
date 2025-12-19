@@ -82,7 +82,7 @@ class PdfTemplateService
         ];
     }
 
-    public function generatePdfsFromTemplate(array $template, array $excelData, array $columnMapping, ?string $pdfFilePath = null, ?string $pdfPageImage = null): array
+    public function generatePdfsFromTemplate(array $template, array $excelData, array $columnMapping, ?string $pdfFilePath = null, $pdfPageImage = null): array
     {
         $pdfPreviews = [];
         $templateName = $template['name'] ?? 'template';
@@ -132,45 +132,79 @@ class PdfTemplateService
         return $pdfPreviews;
     }
 
-    protected function overlayFieldsOnPdf(string $pdfPath, array $pages, array $rowData, array $columnMapping, ?string $pdfPageImageBase64 = null): string
+    protected function overlayFieldsOnPdf(string $pdfPath, array $pages, array $rowData, array $columnMapping, $pdfPageImageBase64 = null): string
     {
-        // Use the base64 image from frontend if available, otherwise try to convert
-        $pdfImageUrl = null;
+        $template = ['width' => 210, 'height' => 297]; // Default A4
+        $html = '';
+        $isFirstPage = true;
         
-        if ($pdfPageImageBase64) {
-            // Use the base64 image directly
-            $pdfImageUrl = $pdfPageImageBase64;
-        } else {
-            // Fallback: try to convert PDF to image using server tools
-            $pdfImageUrl = $this->convertPdfToImage($pdfPath);
-            
-            // If conversion failed, try using PDF file URL (may not work)
-            if (!$pdfImageUrl) {
-                if (strpos($pdfPath, storage_path('app/public/')) !== false) {
-                    $relativePath = str_replace(storage_path('app/public/'), '', $pdfPath);
-                    $pdfImageUrl = Storage::url($relativePath);
-                }
-            }
+        // Handle both single image (string) and array of images
+        $pageImages = [];
+        if (is_array($pdfPageImageBase64)) {
+            $pageImages = $pdfPageImageBase64;
+        } elseif (is_string($pdfPageImageBase64) && !empty($pdfPageImageBase64)) {
+            $pageImages = [$pdfPageImageBase64]; // Convert single image to array
         }
         
-        // Get fields from first page
-        $fields = $pages[0]['fields'] ?? [];
-        $template = ['width' => 210, 'height' => 297]; // Default A4
+        // Process each page
+        foreach ($pages as $pageIndex => $page) {
+            $pageNumber = $pageIndex + 1;
+            $fields = $page['fields'] ?? [];
+            
+            // Get PDF image for this page
+            $pdfImageUrl = null;
+            
+            // Use image from array if available
+            if (isset($pageImages[$pageIndex])) {
+                $pdfImageUrl = $pageImages[$pageIndex];
+            } elseif ($pageIndex === 0 && !empty($pageImages)) {
+                // Fallback: use first image if available
+                $pdfImageUrl = $pageImages[0];
+            } else {
+                // For pages without images, try to convert the specific page
+                $pdfImageUrl = $this->convertPdfToImage($pdfPath, $pageNumber);
+                
+                // If conversion failed, try using PDF file URL (may not work)
+                if (!$pdfImageUrl) {
+                    if (strpos($pdfPath, storage_path('app/public/')) !== false) {
+                        $relativePath = str_replace(storage_path('app/public/'), '', $pdfPath);
+                        $pdfImageUrl = Storage::url($relativePath);
+                    }
+                }
+            }
+            
+            // Build HTML for this page with PDF image as background and fields overlaid
+            // Only include full HTML structure for first page
+            $pageHtml = $this->buildHtmlWithPdfImageBackground($template, $pdfImageUrl, null, $fields, $rowData, $columnMapping, $isFirstPage);
+            
+            if ($isFirstPage) {
+                // Extract just the page div content from first page (remove closing body/html tags)
+                $pageHtml = preg_replace('/<\/body>.*?<\/html>/s', '', $pageHtml);
+                $isFirstPage = false;
+            } else {
+                // For subsequent pages, extract just the page div (remove any HTML structure)
+                $pageHtml = preg_replace('/<!DOCTYPE html>.*?<body>/s', '', $pageHtml);
+                $pageHtml = preg_replace('/<\/body>.*?<\/html>/s', '', $pageHtml);
+                $pageHtml = preg_replace('/<style>.*?<\/style>/s', '', $pageHtml);
+            }
+            
+            $html .= trim($pageHtml);
+        }
         
-        // Build HTML with PDF image as background and fields overlaid
-        $html = $this->buildHtmlWithPdfImageBackground($template, $pdfImageUrl, null, $fields, $rowData, $columnMapping);
+        // Close the HTML structure
+        $html .= '</body></html>';
         
         // Generate PDF from HTML using DomPDF
         return $this->generatePdfBinaryFromHtml($html, $template);
     }
     
-    protected function convertPdfToImage(string $pdfPath): ?string
+    protected function convertPdfToImage(string $pdfPath, int $pageNumber = 1): ?string
     {
-        // Try to convert PDF first page to image using available tools
+        // Try to convert PDF page to image using available tools
         // Use JPG format for faster processing and smaller file size
         // Method 1: Try Ghostscript (gs command)
         if ($this->commandExists('gs')) {
-            $imagePath = storage_path('app/public/pdf-templates/' . uniqid() . '_page1.jpg');
+            $imagePath = storage_path('app/public/pdf-templates/' . uniqid() . '_page' . $pageNumber . '.jpg');
             $dir = dirname($imagePath);
             if (!file_exists($dir)) {
                 mkdir($dir, 0755, true);
@@ -178,7 +212,9 @@ class PdfTemplateService
             
             // Use jpeg device with optimized quality and resolution for faster conversion
             $command = sprintf(
-                'gs -dNOPAUSE -dBATCH -sDEVICE=jpeg -dJPEGQ=85 -r200 -dFirstPage=1 -dLastPage=1 -sOutputFile=%s %s 2>&1',
+                'gs -dNOPAUSE -dBATCH -sDEVICE=jpeg -dJPEGQ=85 -r200 -dFirstPage=%d -dLastPage=%d -sOutputFile=%s %s 2>&1',
+                $pageNumber,
+                $pageNumber,
                 escapeshellarg($imagePath),
                 escapeshellarg($pdfPath)
             );
@@ -192,7 +228,7 @@ class PdfTemplateService
         
         // Method 2: Try pdftoppm (poppler-utils)
         if ($this->commandExists('pdftoppm')) {
-            $imagePath = storage_path('app/public/pdf-templates/' . uniqid() . '_page1');
+            $imagePath = storage_path('app/public/pdf-templates/' . uniqid() . '_page' . $pageNumber);
             $dir = dirname($imagePath);
             if (!file_exists($dir)) {
                 mkdir($dir, 0755, true);
@@ -200,7 +236,9 @@ class PdfTemplateService
             
             // Use jpeg format with optimized quality and resolution for faster conversion
             $command = sprintf(
-                'pdftoppm -jpeg -jpegopt quality=85 -f 1 -l 1 -r 200 %s %s 2>&1',
+                'pdftoppm -jpeg -jpegopt quality=85 -f %d -l %d -r 200 %s %s 2>&1',
+                $pageNumber,
+                $pageNumber,
                 escapeshellarg($pdfPath),
                 escapeshellarg($imagePath)
             );
@@ -244,7 +282,7 @@ class PdfTemplateService
         return false;
     }
     
-    protected function buildHtmlWithPdfImageBackground(array $template, ?string $pdfImageUrl, ?string $pdfFileUrl, array $fields, array $rowData, array $columnMapping): string
+    protected function buildHtmlWithPdfImageBackground(array $template, ?string $pdfImageUrl, ?string $pdfFileUrl, array $fields, array $rowData, array $columnMapping, bool $includeHtmlStructure = true): string
     {
         $width = $template['width'] ?? 210;
         $height = $template['height'] ?? 297;
@@ -256,7 +294,8 @@ class PdfTemplateService
             $backgroundUrl = asset($pdfFileUrl);
         }
         
-        $html = '<!DOCTYPE html>
+        if ($includeHtmlStructure) {
+            $html = '<!DOCTYPE html>
 <html>
 <head>
     <meta charset="UTF-8">
@@ -280,6 +319,10 @@ class PdfTemplateService
             margin: 0;
             padding: 0;
             box-sizing: border-box;
+            page-break-after: always;
+        }
+        .page:last-child {
+            page-break-after: auto;
         }
         .pdf-background {
             position: absolute;
@@ -309,6 +352,10 @@ class PdfTemplateService
 <body>
     <div class="page">
 ';
+        } else {
+            $html = '<div class="page">
+';
+        }
         
         // Add PDF background image if available
         if ($backgroundUrl) {
@@ -415,9 +462,13 @@ class PdfTemplateService
         }
         
         $html .= '
-    </div>
+    </div>';
+        
+        if ($includeHtmlStructure) {
+            $html .= '
 </body>
 </html>';
+        }
         
         return $html;
     }

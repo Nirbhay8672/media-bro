@@ -7,7 +7,7 @@ import ExcelUploader from '@/components/PdfTemplate/ExcelUploader.vue';
 import PdfUploader from '@/components/PdfTemplate/PdfUploader.vue';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { X, Plus, Pencil, Eye } from 'lucide-vue-next';
@@ -85,7 +85,7 @@ const selectedField = ref<Field | null>(null);
 const editingField = ref<Field | null>(null);
 const uploadedPdfUrl = ref<string>('');
 const uploadedPdfPath = ref<string>('');
-const pdfPageImageBase64 = ref<string>('');
+const pdfPageImageBase64 = ref<string | string[]>([]);
 const fieldForm = ref({
     label: '',
     column: '',
@@ -148,8 +148,28 @@ const handlePdfUpload = (data: any) => {
     }
 };
 
-const handlePdfImageConverted = (base64: string) => {
+const handlePdfImageConverted = (base64: string | string[]) => {
     pdfPageImageBase64.value = base64;
+};
+
+const handlePdfPagesDetected = (numPages: number) => {
+    // If we have fewer pages in template than PDF pages, add missing pages
+    if (numPages > template.value.pages.length) {
+        const currentPageCount = template.value.pages.length;
+        for (let i = currentPageCount; i < numPages; i++) {
+            const newPageId = (i + 1).toString();
+            template.value.pages.push({ id: newPageId, fields: [] });
+        }
+    }
+    // If we have more pages in template than PDF pages, remove extra pages (but keep at least 1)
+    else if (numPages < template.value.pages.length && numPages > 0) {
+        template.value.pages = template.value.pages.slice(0, numPages);
+        if (currentPageIndex.value >= template.value.pages.length) {
+            currentPageIndex.value = template.value.pages.length - 1;
+        }
+    }
+    
+    handleTemplateUpdate(template.value);
 };
 
 const handleExcelUpload = (data: any) => {
@@ -505,6 +525,7 @@ watch(showEditFieldDialog, (isOpen) => {
                                     <DialogContent>
                                         <DialogHeader>
                                             <DialogTitle>Add Field</DialogTitle>
+                                            <DialogDescription>Add a new field to the template</DialogDescription>
                                         </DialogHeader>
                                         <div class="space-y-4 py-4">
                                             <div>
@@ -678,6 +699,7 @@ watch(showEditFieldDialog, (isOpen) => {
                     <DialogContent>
                         <DialogHeader>
                             <DialogTitle>Edit Field</DialogTitle>
+                            <DialogDescription>Edit field properties</DialogDescription>
                         </DialogHeader>
                         <div class="space-y-4 py-4">
                             <div>
@@ -786,12 +808,14 @@ watch(showEditFieldDialog, (isOpen) => {
                         :show-only-canvas="true"
                         :selected-field-id="selectedField?.id || null"
                         :pdf-background-url="uploadedPdfUrl"
+                        :current-page-number="currentPageIndex + 1"
                         @update="(updatedTemplate) => {
                             currentPage.fields = updatedTemplate.fields;
                             handleTemplateUpdate(template);
                         }"
                         @field-selected="selectField"
                         @pdf-image-converted="handlePdfImageConverted"
+                        @pdf-pages-detected="handlePdfPagesDetected"
                     />
                 </div>
             </div>
@@ -802,6 +826,7 @@ watch(showEditFieldDialog, (isOpen) => {
             <DialogContent class="!w-[80vw] !max-w-[80vw] max-h-[90vh] overflow-hidden flex flex-col mx-auto">
                 <DialogHeader>
                     <DialogTitle>PDF Preview</DialogTitle>
+                    <DialogDescription>Preview and download generated PDFs</DialogDescription>
                 </DialogHeader>
                 <div class="flex-1 overflow-auto">
                     <div v-if="generatedPdfs.length === 0" class="text-center py-8 text-gray-500">
@@ -842,6 +867,7 @@ watch(showEditFieldDialog, (isOpen) => {
             <DialogContent class="!w-[80vw] !max-w-[80vw] max-h-[90vh] overflow-hidden flex flex-col mx-auto">
                 <DialogHeader>
                     <DialogTitle>Excel File Data</DialogTitle>
+                    <DialogDescription>View uploaded Excel file data</DialogDescription>
                 </DialogHeader>
                 <div class="flex-1 overflow-auto">
                     <div v-if="excelData.length === 0" class="text-center py-8 text-gray-500">

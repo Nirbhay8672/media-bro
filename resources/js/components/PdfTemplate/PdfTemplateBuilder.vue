@@ -41,13 +41,15 @@ interface Props {
     showOnlyCanvas?: boolean;
     selectedFieldId?: string | null;
     pdfBackgroundUrl?: string;
+    currentPageNumber?: number; // Current page number to display (1-based)
 }
 
 const props = defineProps<Props>();
 const emit = defineEmits<{
     update: [template: Props['template']];
     fieldSelected: [field: Field | null];
-    pdfImageConverted: [base64: string];
+    pdfImageConverted: [base64: string | string[]]; // Can be single image or array of images for multiple pages
+    pdfPagesDetected: [numPages: number]; // Emit when PDF pages are detected
 }>();
 
 const canvasRef = ref<HTMLElement | null>(null);
@@ -55,6 +57,10 @@ const selectedField = ref<Field | null>(null);
 const pdfCanvasRef = ref<HTMLCanvasElement | null>(null);
 const pdfLoading = ref(false);
 const pdfError = ref<string | null>(null);
+const pdfDocument = ref<any>(null); // Store the PDF document
+const pdfLoadingTask = ref<any>(null); // Store the loading task
+const cachedPageImages = ref<Map<number, HTMLImageElement>>(new Map()); // Cache all page images
+const cachedPageCanvases = ref<Map<number, HTMLCanvasElement>>(new Map()); // Cache all page canvases
 
 // Watch for external selection changes
 watch(() => props.selectedFieldId, (newId) => {
@@ -316,15 +322,11 @@ const startResize = (e: MouseEvent, handle: string) => {
 
 // Load and render PDF
 const loadPdf = async () => {
-    console.log('loadPdf called', { url: props.pdfBackgroundUrl, hasCanvas: !!pdfCanvasRef.value });
-    
     if (!props.pdfBackgroundUrl) {
-        console.warn('No PDF URL provided');
         return;
     }
     
     if (!pdfCanvasRef.value) {
-        console.warn('Canvas ref not available');
         return;
     }
     
@@ -334,17 +336,14 @@ const loadPdf = async () => {
     try {
         // Load PDF.js from CDN if not already loaded
         if (!window.pdfjsLib) {
-            console.log('Loading PDF.js from CDN...');
             await new Promise((resolve, reject) => {
                 const script = document.createElement('script');
                 script.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
                 script.onload = () => {
                     window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-                    console.log('PDF.js loaded successfully');
                     resolve(true);
                 };
                 script.onerror = () => {
-                    console.error('Failed to load PDF.js script');
                     reject(new Error('Failed to load PDF.js'));
                 };
                 document.head.appendChild(script);
@@ -352,7 +351,6 @@ const loadPdf = async () => {
         }
         await renderPdf();
     } catch (error: any) {
-        console.error('PDF load error:', error);
         pdfError.value = 'Failed to load PDF: ' + (error.message || 'Unknown error');
         pdfLoading.value = false;
     }
@@ -360,27 +358,61 @@ const loadPdf = async () => {
 
 const renderPdf = async () => {
     if (!props.pdfBackgroundUrl || !pdfCanvasRef.value || !window.pdfjsLib) {
-        console.warn('Cannot render PDF:', { 
-            hasUrl: !!props.pdfBackgroundUrl, 
-            hasCanvas: !!pdfCanvasRef.value, 
-            hasPdfJs: !!window.pdfjsLib 
-        });
         return;
     }
     
     try {
-        console.log('Rendering PDF:', props.pdfBackgroundUrl);
-        const loadingTask = window.pdfjsLib.getDocument({
-            url: props.pdfBackgroundUrl,
-            withCredentials: false
-        });
-        const pdf = await loadingTask.promise;
-        console.log('PDF loaded, pages:', pdf.numPages);
+        // Use stored PDF document if available, otherwise load it
+        let pdf = pdfDocument.value;
+        if (!pdf || !pdfLoadingTask.value) {
+            // Create new loading task
+            const loadingTask = window.pdfjsLib.getDocument({
+                url: props.pdfBackgroundUrl,
+                withCredentials: false
+            });
+            pdfLoadingTask.value = loadingTask;
+            pdf = await loadingTask.promise;
+            pdfDocument.value = pdf; // Store for future use
+            
+            // Emit the number of pages detected when PDF is first loaded
+            emit('pdfPagesDetected', pdf.numPages);
+        }
         
-        // Get first page only (single page requirement)
-        const page = await pdf.getPage(1);
+        // Verify PDF document is still valid
+        if (!pdf) {
+            throw new Error('PDF document is not loaded');
+        }
+        
+        // Ensure PDF is fully loaded by checking numPages
+        if (!pdf.numPages || pdf.numPages === 0) {
+            throw new Error('PDF document is not fully loaded');
+        }
+        
+        // Get the current page to display (default to page 1)
+        const pageNumberToDisplay = props.currentPageNumber || 1;
+        const pageNumber = Math.min(Math.max(1, pageNumberToDisplay), pdf.numPages);
+        
+        // Get the page with error handling
+        let page;
+        try {
+            page = await pdf.getPage(pageNumber);
+        } catch (pageError: any) {
+            // If page access fails, reload the PDF from scratch
+            pdfDocument.value = null;
+            pdfLoadingTask.value = null;
+            
+            const loadingTask = window.pdfjsLib.getDocument({
+                url: props.pdfBackgroundUrl,
+                withCredentials: false
+            });
+            pdfLoadingTask.value = loadingTask;
+            pdf = await loadingTask.promise;
+            pdfDocument.value = pdf;
+            
+            // Try getting the page again
+            page = await pdf.getPage(pageNumber);
+        }
         const viewport = page.getViewport({ scale: 1.0 });
-        console.log('Page viewport:', viewport);
         
         const canvas = pdfCanvasRef.value;
         const context = canvas.getContext('2d');
@@ -404,76 +436,101 @@ const renderPdf = async () => {
         canvas.width = scaledViewport.width;
         canvas.height = scaledViewport.height;
         
-        console.log('Canvas size:', canvas.width, canvas.height);
-        
         const renderContext = {
             canvasContext: context,
             viewport: scaledViewport
         };
         
         await page.render(renderContext).promise;
-        console.log('PDF rendered for display');
         
-        // Create optimized canvas for export (separate from display)
-        // Use 2.5x scale (200 DPI) - good quality with faster processing
-        // This balances quality and speed for faster PDF generation
+        // Convert all pages to images for export
         const exportScale = 2.5;
-        const exportViewport = page.getViewport({ scale: exportScale });
+        const pageImages: string[] = [];
         
-        // Create temporary canvas for export
-        const exportCanvas = document.createElement('canvas');
-        exportCanvas.width = exportViewport.width;
-        exportCanvas.height = exportViewport.height;
-        
-        const exportContext = exportCanvas.getContext('2d', {
-            alpha: false,
-            desynchronized: false,
-            willReadFrequently: false
-        });
-        
-        if (!exportContext) {
-            throw new Error('Could not get export canvas context');
+        // Process all pages
+        for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+            const exportPage = await pdf.getPage(pageNum);
+            const exportViewport = exportPage.getViewport({ scale: exportScale });
+            
+            // Create temporary canvas for export
+            const exportCanvas = document.createElement('canvas');
+            exportCanvas.width = exportViewport.width;
+            exportCanvas.height = exportViewport.height;
+            
+            const exportContext = exportCanvas.getContext('2d', {
+                alpha: false,
+                desynchronized: false,
+                willReadFrequently: false
+            });
+            
+            if (!exportContext) {
+                throw new Error('Could not get export canvas context');
+            }
+            
+            // Fill white background for proper alignment
+            exportContext.fillStyle = '#FFFFFF';
+            exportContext.fillRect(0, 0, exportCanvas.width, exportCanvas.height);
+            
+            // Center the PDF content when using cover mode
+            const exportOffsetX = (exportCanvas.width - exportViewport.width) / 2;
+            const exportOffsetY = (exportCanvas.height - exportViewport.height) / 2;
+            
+            exportContext.save();
+            exportContext.translate(exportOffsetX, exportOffsetY);
+            
+            // Enable high-quality rendering
+            exportContext.imageSmoothingEnabled = true;
+            exportContext.imageSmoothingQuality = 'high';
+            
+            const exportRenderContext = {
+                canvasContext: exportContext,
+                viewport: exportViewport
+            };
+            
+            await exportPage.render(exportRenderContext).promise;
+            exportContext.restore();
+            
+            // Use JPG format with optimized quality for faster processing
+            const imageData = exportCanvas.toDataURL('image/jpeg', 0.85);
+            pageImages.push(imageData);
         }
         
-        // Enable high-quality rendering
-        exportContext.imageSmoothingEnabled = true;
-        exportContext.imageSmoothingQuality = 'high';
-        
-        const exportRenderContext = {
-            canvasContext: exportContext,
-            viewport: exportViewport
-        };
-        
-        await page.render(exportRenderContext).promise;
-        console.log('Optimized PDF rendered for export at', exportScale, 'x scale (200 DPI)');
-        
-        // Use JPG format with optimized quality for faster processing
-        // JPG with 0.85 quality provides good quality while being much faster
-        // This optimizes PDF generation speed while maintaining proper alignment
-        const imageData = exportCanvas.toDataURL('image/jpeg', 0.85);
-        const sizeKB = (imageData.length / 1024).toFixed(2);
-        const sizeMB = (imageData.length / 1024 / 1024).toFixed(2);
-        console.log('JPG export image size:', sizeKB, 'KB (' + sizeMB + ' MB)');
-        emit('pdfImageConverted', imageData);
+        // Emit single image for first page (backward compatibility) or array for all pages
+        if (pageImages.length === 1) {
+            emit('pdfImageConverted', pageImages[0]);
+        } else {
+            emit('pdfImageConverted', pageImages);
+        }
         
         pdfLoading.value = false;
     } catch (error: any) {
-        console.error('PDF render error:', error);
         pdfError.value = 'Failed to render PDF: ' + (error.message || 'Unknown error');
         pdfLoading.value = false;
     }
 };
 
+// Watch for page number changes to re-render the correct page
+watch(() => props.currentPageNumber, async () => {
+    if (pdfCanvasRef.value && props.pdfBackgroundUrl) {
+        // Ensure PDF is loaded before rendering
+        if (!pdfDocument.value) {
+            await loadPdf();
+        } else {
+            await renderPdf();
+        }
+    }
+});
+
 // Watch for PDF URL changes
 watch(() => props.pdfBackgroundUrl, (newUrl) => {
-    console.log('PDF URL changed:', newUrl);
+    // Reset PDF document and loading task when URL changes
+    pdfDocument.value = null;
+    pdfLoadingTask.value = null;
     if (newUrl) {
         // Wait for next tick to ensure canvas is rendered
         setTimeout(() => {
             if (pdfCanvasRef.value) {
                 loadPdf();
-            } else {
-                console.warn('PDF canvas ref not available yet');
             }
         }, 200);
     }
@@ -494,7 +551,6 @@ onMounted(() => {
     // Wait for canvas to be rendered, then load PDF if URL is available
     setTimeout(() => {
         if (props.pdfBackgroundUrl && pdfCanvasRef.value) {
-            console.log('Mounting with PDF URL:', props.pdfBackgroundUrl);
             loadPdf();
         }
     }, 300);
