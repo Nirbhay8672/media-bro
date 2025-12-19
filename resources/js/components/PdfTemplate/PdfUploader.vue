@@ -33,12 +33,27 @@ const handleFileSelect = async (event: Event) => {
     isUploading.value = true;
     
     try {
+        // Check file size (50MB = 50 * 1024 * 1024 bytes)
+        const maxSize = 50 * 1024 * 1024;
+        if (file.size > maxSize) {
+            alert(`File size (${(file.size / 1024 / 1024).toFixed(2)}MB) exceeds the maximum allowed size of 50MB.`);
+            isUploading.value = false;
+            return;
+        }
+
         const formData = new FormData();
         formData.append('pdf_file', file);
 
         const response = await axios.post('/pdf-templates/upload-pdf', formData, {
             headers: {
                 'Content-Type': 'multipart/form-data',
+            },
+            timeout: 120000, // 2 minutes timeout for large files
+            onUploadProgress: (progressEvent) => {
+                if (progressEvent.total) {
+                    const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+                    console.log(`Upload progress: ${percentCompleted}%`);
+                }
             },
         });
 
@@ -49,7 +64,27 @@ const handleFileSelect = async (event: Event) => {
             dimensions: response.data.dimensions,
         });
     } catch (error: any) {
-        alert('Error uploading file: ' + (error.response?.data?.message || error.message));
+        console.error('PDF Upload Error:', error);
+        
+        let errorMessage = 'Error uploading file. ';
+        
+        if (error.response) {
+            // Server responded with error
+            const errors = error.response.data?.errors;
+            if (errors && errors.pdf_file) {
+                errorMessage += errors.pdf_file[0] || error.response.data?.message || 'Unknown error';
+            } else {
+                errorMessage += error.response.data?.message || `Server error (${error.response.status})`;
+            }
+        } else if (error.request) {
+            // Request was made but no response received
+            errorMessage += 'No response from server. Please check your connection.';
+        } else {
+            // Error in setting up the request
+            errorMessage += error.message || 'Unknown error occurred';
+        }
+        
+        alert(errorMessage);
     } finally {
         isUploading.value = false;
         if (fileInput.value) {
