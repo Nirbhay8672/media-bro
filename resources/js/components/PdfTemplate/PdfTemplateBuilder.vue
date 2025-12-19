@@ -203,13 +203,18 @@ const getFieldStyle = (field: Field) => {
     const xPx = field.x * mmToPx * scale.value;
     const yPx = field.y * mmToPx * scale.value;
     const widthPx = field.width * mmToPx * scale.value;
-    const heightPx = field.height * mmToPx * scale.value;
+    
+    // Use 'auto' height by default, but use fixed height if it was explicitly set via resize
+    // If height is 0 or undefined, use 'auto', otherwise use the calculated height
+    const heightStyle = (field.height && field.height > 0) 
+        ? `${field.height * mmToPx * scale.value}px` 
+        : 'auto';
     
     return {
         left: `${xPx}px`,
         top: `${yPx}px`,
         width: `${widthPx}px`,
-        height: `${heightPx}px`,
+        height: heightStyle,
         fontFamily: field.fontFamily || 'Arial',
         color: field.fontColor || '#000000',
         fontWeight: field.fontWeight || 'normal',
@@ -263,8 +268,10 @@ const onMouseMove = (e: MouseEvent) => {
         const newX = x - dragOffset.value.x;
         const newY = y - dragOffset.value.y;
         
+        // Use minimum height of 20px for drag calculations if height is auto (0)
+        const effectiveHeight = field.height > 0 ? field.height : 20;
         field.x = Math.max(0, Math.min(newX, props.template.width - field.width));
-        field.y = Math.max(0, Math.min(newY, props.template.height - field.height));
+        field.y = Math.max(0, Math.min(newY, props.template.height - effectiveHeight));
         updateTemplate();
     } else if (isResizing.value && selectedField.value && resizeHandle.value) {
         const field = selectedField.value;
@@ -405,10 +412,48 @@ const renderPdf = async () => {
         };
         
         await page.render(renderContext).promise;
-        console.log('PDF rendered successfully');
+        console.log('PDF rendered for display');
         
-        // Convert canvas to base64 image for backend use
-        const imageData = canvas.toDataURL('image/png');
+        // Create optimized canvas for export (separate from display)
+        // Use 2.5x scale (200 DPI) - good quality with faster processing
+        // This balances quality and speed for faster PDF generation
+        const exportScale = 2.5;
+        const exportViewport = page.getViewport({ scale: exportScale });
+        
+        // Create temporary canvas for export
+        const exportCanvas = document.createElement('canvas');
+        exportCanvas.width = exportViewport.width;
+        exportCanvas.height = exportViewport.height;
+        
+        const exportContext = exportCanvas.getContext('2d', {
+            alpha: false,
+            desynchronized: false,
+            willReadFrequently: false
+        });
+        
+        if (!exportContext) {
+            throw new Error('Could not get export canvas context');
+        }
+        
+        // Enable high-quality rendering
+        exportContext.imageSmoothingEnabled = true;
+        exportContext.imageSmoothingQuality = 'high';
+        
+        const exportRenderContext = {
+            canvasContext: exportContext,
+            viewport: exportViewport
+        };
+        
+        await page.render(exportRenderContext).promise;
+        console.log('Optimized PDF rendered for export at', exportScale, 'x scale (200 DPI)');
+        
+        // Use JPG format with optimized quality for faster processing
+        // JPG with 0.85 quality provides good quality while being much faster
+        // This optimizes PDF generation speed while maintaining proper alignment
+        const imageData = exportCanvas.toDataURL('image/jpeg', 0.85);
+        const sizeKB = (imageData.length / 1024).toFixed(2);
+        const sizeMB = (imageData.length / 1024 / 1024).toFixed(2);
+        console.log('JPG export image size:', sizeKB, 'KB (' + sizeMB + ' MB)');
         emit('pdfImageConverted', imageData);
         
         pdfLoading.value = false;
@@ -736,17 +781,18 @@ const updateFieldProperty = (field: Field, property: keyof Field, value: any) =>
                                 :class="[
                                     'absolute border-2 cursor-move select-none',
                                     selectedField?.id === field.id 
-                                        ? 'border-blue-600 bg-blue-200 shadow-lg' 
-                                        : 'border-blue-400 bg-blue-100',
-                                    props.pdfBackgroundUrl ? 'bg-opacity-80' : ''
+                                        ? 'border-blue-600 shadow-lg bg-transparent' 
+                                        : 'border-blue-400 bg-transparent',
                                 ]"
                                 :style="{ ...getFieldStyle(field), zIndex: selectedField?.id === field.id ? 30 : 20 }"
                                 @mousedown.prevent="startDrag($event, field)"
                                 @click.stop="selectField(field)"
                             >
-                                <div class="h-full p-2 pointer-events-none w-full flex items-center" :style="{
+                                <div class="pointer-events-none w-full flex" :style="{
                                     textAlign: field.textAlign || 'left',
                                     justifyContent: field.textAlign === 'center' ? 'center' : field.textAlign === 'right' ? 'flex-end' : 'flex-start',
+                                    padding: '3px',
+                                    margin: 0,
                                 }">
                                     <span :style="{
                                         fontFamily: field.fontFamily || 'Arial',
@@ -757,6 +803,9 @@ const updateFieldProperty = (field: Field, property: keyof Field, value: any) =>
                                         fontSize: `${(field.fontSize || 16) * scale}px`,
                                         display: 'inline-block',
                                         width: '100%',
+                                        lineHeight: 1,
+                                        padding: 0,
+                                        margin: 0,
                                     }">{{ field.label || field.column }}</span>
                                 </div>
                                 <div
@@ -827,17 +876,18 @@ const updateFieldProperty = (field: Field, property: keyof Field, value: any) =>
                             :class="[
                                 'absolute border-2 cursor-move select-none',
                                 selectedField?.id === field.id 
-                                    ? 'border-blue-600 bg-blue-200 shadow-lg' 
-                                    : 'border-blue-400 bg-blue-100',
-                                props.pdfBackgroundUrl ? 'bg-opacity-80' : ''
+                                    ? 'border-blue-600 shadow-lg bg-transparent' 
+                                    : 'border-blue-400 bg-transparent',
                             ]"
                             :style="{ ...getFieldStyle(field), zIndex: selectedField?.id === field.id ? 30 : 20 }"
                             @mousedown.prevent="startDrag($event, field)"
                             @click.stop="selectField(field)"
                         >
-                            <div class="h-full p-2 pointer-events-none w-full flex items-center" :style="{
+                            <div class="pointer-events-none w-full flex" :style="{
                                 textAlign: field.textAlign || 'left',
                                 justifyContent: field.textAlign === 'center' ? 'center' : field.textAlign === 'right' ? 'flex-end' : 'flex-start',
+                                padding: '3px',
+                                margin: 0,
                             }">
                                 <span :style="{
                                     fontFamily: field.fontFamily || 'Arial',
@@ -848,6 +898,9 @@ const updateFieldProperty = (field: Field, property: keyof Field, value: any) =>
                                     fontSize: `${(field.fontSize || 16) * scale}px`,
                                     display: 'inline-block',
                                     width: '100%',
+                                    lineHeight: 1,
+                                    padding: 0,
+                                    margin: 0,
                                 }">{{ field.label || field.column }}</span>
                             </div>
                             <div

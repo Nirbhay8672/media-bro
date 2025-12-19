@@ -258,19 +258,44 @@ const generatePdfs = async () => {
 };
 
 const downloadPdfFromBase64 = (pdf: { filename: string; base64: string }) => {
-    const link = document.createElement('a');
-    link.href = `data:application/pdf;base64,${pdf.base64}`;
-    link.download = pdf.filename;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    try {
+        // Convert base64 to blob for faster download
+        const byteCharacters = atob(pdf.base64);
+        const byteNumbers = new Array(byteCharacters.length);
+        for (let i = 0; i < byteCharacters.length; i++) {
+            byteNumbers[i] = byteCharacters.charCodeAt(i);
+        }
+        const byteArray = new Uint8Array(byteNumbers);
+        const blob = new Blob([byteArray], { type: 'application/pdf' });
+        
+        // Use blob URL for faster download
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = pdf.filename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        // Clean up blob URL after a short delay
+        setTimeout(() => URL.revokeObjectURL(url), 100);
+    } catch (error) {
+        // Fallback to data URL if blob fails
+        const link = document.createElement('a');
+        link.href = `data:application/pdf;base64,${pdf.base64}`;
+        link.download = pdf.filename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }
 };
 
 const downloadAllPdfs = () => {
-    generatedPdfs.value.forEach((pdf: any) => {
+    // Download all PDFs with minimal delay for faster batch downloads
+    generatedPdfs.value.forEach((pdf: any, index: number) => {
         setTimeout(() => {
             downloadPdfFromBase64(pdf);
-        }, 100);
+        }, index * 50); // Reduced delay from 100ms to 50ms
     });
 };
 
@@ -286,7 +311,7 @@ const addField = () => {
         x: 10,
         y: 10,
         width: 100,
-        height: 30,
+        height: 0, // 0 means auto height, will be set when user resizes
         column: fieldForm.value.column.trim(),
         label: fieldForm.value.label.trim(),
         fontSize: fieldForm.value.fontSize || 16,

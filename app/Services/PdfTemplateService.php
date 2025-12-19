@@ -91,8 +91,10 @@ class PdfTemplateService
         // If PDF file is provided, use overlay method; otherwise use HTML generation
         if ($pdfFilePath && Storage::disk('public')->exists($pdfFilePath)) {
             foreach ($excelData as $index => $row) {
-                $timestamp = date('Y-m-d_H-i-s');
-                $filename = 'bromi_' . $templateName . '_' . ($index + 1) . '_' . $timestamp . '.pdf';
+                // Generate 6-digit timestamp: use microtime with index to ensure uniqueness
+                $baseTime = (int)(microtime(true) * 1000000);
+                $timestamp = substr($baseTime + $index, -6);
+                $filename = $timestamp . '.pdf';
                 
                 $binary = $this->overlayFieldsOnPdf(
                     storage_path('app/public/' . $pdfFilePath),
@@ -112,8 +114,10 @@ class PdfTemplateService
             // Original HTML-based generation
             foreach ($excelData as $index => $row) {
                 $html = $this->buildHtmlFromTemplate($template, $row, $columnMapping, $pages);
-                $timestamp = date('Y-m-d_H-i-s');
-                $filename = 'bromi_' . $templateName . '_' . ($index + 1) . '_' . $timestamp . '.pdf';
+                // Generate 6-digit timestamp: use microtime with index to ensure uniqueness
+                $baseTime = (int)(microtime(true) * 1000000);
+                $timestamp = substr($baseTime + $index, -6);
+                $filename = $timestamp . '.pdf';
 
                 $binary = $this->generatePdfBinaryFromHtml($html, $template);
 
@@ -163,16 +167,18 @@ class PdfTemplateService
     protected function convertPdfToImage(string $pdfPath): ?string
     {
         // Try to convert PDF first page to image using available tools
+        // Use JPG format for faster processing and smaller file size
         // Method 1: Try Ghostscript (gs command)
         if ($this->commandExists('gs')) {
-            $imagePath = storage_path('app/public/pdf-templates/' . uniqid() . '_page1.png');
+            $imagePath = storage_path('app/public/pdf-templates/' . uniqid() . '_page1.jpg');
             $dir = dirname($imagePath);
             if (!file_exists($dir)) {
                 mkdir($dir, 0755, true);
             }
             
+            // Use jpeg device with optimized quality and resolution for faster conversion
             $command = sprintf(
-                'gs -dNOPAUSE -dBATCH -sDEVICE=png16m -r300 -dFirstPage=1 -dLastPage=1 -sOutputFile=%s %s 2>&1',
+                'gs -dNOPAUSE -dBATCH -sDEVICE=jpeg -dJPEGQ=85 -r200 -dFirstPage=1 -dLastPage=1 -sOutputFile=%s %s 2>&1',
                 escapeshellarg($imagePath),
                 escapeshellarg($pdfPath)
             );
@@ -186,14 +192,15 @@ class PdfTemplateService
         
         // Method 2: Try pdftoppm (poppler-utils)
         if ($this->commandExists('pdftoppm')) {
-            $imagePath = storage_path('app/public/pdf-templates/' . uniqid() . '_page1.png');
+            $imagePath = storage_path('app/public/pdf-templates/' . uniqid() . '_page1');
             $dir = dirname($imagePath);
             if (!file_exists($dir)) {
                 mkdir($dir, 0755, true);
             }
             
+            // Use jpeg format with optimized quality and resolution for faster conversion
             $command = sprintf(
-                'pdftoppm -png -f 1 -l 1 -r 300 %s %s 2>&1',
+                'pdftoppm -jpeg -jpegopt quality=85 -f 1 -l 1 -r 200 %s %s 2>&1',
                 escapeshellarg($pdfPath),
                 escapeshellarg($imagePath)
             );
@@ -201,11 +208,12 @@ class PdfTemplateService
             exec($command, $output, $returnCode);
             
             // pdftoppm creates files with -1 suffix
-            $actualImagePath = $imagePath . '-1.png';
+            $actualImagePath = $imagePath . '-1.jpg';
             if ($returnCode === 0 && file_exists($actualImagePath)) {
                 // Rename to remove suffix
-                rename($actualImagePath, $imagePath);
-                return Storage::url(str_replace(storage_path('app/public/'), '', $imagePath));
+                $finalImagePath = $imagePath . '.jpg';
+                rename($actualImagePath, $finalImagePath);
+                return Storage::url(str_replace(storage_path('app/public/'), '', $finalImagePath));
             }
         }
         
@@ -269,6 +277,9 @@ class PdfTemplateService
             position: relative;
             background: white;
             overflow: hidden;
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
         }
         .pdf-background {
             position: absolute;
@@ -278,6 +289,10 @@ class PdfTemplateService
             height: 100%;
             z-index: 1;
             object-fit: contain;
+            image-rendering: -webkit-optimize-contrast;
+            image-rendering: crisp-edges;
+            image-rendering: high-quality;
+            image-rendering: -moz-crisp-edges;
         }
         .field {
             position: absolute;
@@ -299,7 +314,8 @@ class PdfTemplateService
         if ($backgroundUrl) {
             // Check if it's a base64 data URI
             if (strpos($backgroundUrl, 'data:image') === 0) {
-                // Use base64 data URI directly
+                // Use base64 data URI directly - this preserves maximum quality
+                // DomPDF will embed the image directly without re-compression
                 $html .= '<img class="pdf-background" src="' . htmlspecialchars($backgroundUrl, ENT_QUOTES, 'UTF-8') . '" alt="PDF Background" />';
             } else {
                 // Use absolute URL for DomPDF
@@ -308,7 +324,7 @@ class PdfTemplateService
                     // Convert relative URL to absolute
                     $absoluteUrl = url($backgroundUrl);
                 }
-                $html .= '<img class="pdf-background" src="' . htmlspecialchars($absoluteUrl, ENT_QUOTES, 'UTF-8') . '" alt="PDF Background" />';
+                $html .= '<img class="pdf-background" src="' . htmlspecialchars($absoluteUrl, ENT_QUOTES, 'UTF-8') . '" alt="PDF Background" style="max-width: 100%; max-height: 100%; object-fit: contain;" />';
             }
         }
         
@@ -350,19 +366,45 @@ class PdfTemplateService
             $fontStyle = $field['fontStyle'] ?? 'normal';
             $textDecoration = $field['textDecoration'] ?? 'none';
             
+            // Font size is stored as pixels in the frontend, but for PDF we use points
+            // At 96 DPI: 1px = 0.75pt, but for accurate rendering we need to account for DPI
+            // For 300 DPI PDF output: 1px (96 DPI) = 0.75pt, but we want to maintain visual size
+            // So we convert: fontSize in px (96 DPI) to pt (PDF standard)
+            // The correct conversion is: pt = px * (72/96) = px * 0.75
+            // However, to match what user sees on screen, we should use the fontSize directly as points
+            // Since users typically think in points for PDFs, we'll use fontSize directly as points
+            $fontSizePt = $fontSize; // Use fontSize directly as points (user input is treated as points)
+            
+            // Build text alignment
+            $textAlignStyle = '';
+            if ($textAlign === 'center') {
+                $textAlignStyle = 'text-align: center;';
+            } elseif ($textAlign === 'right') {
+                $textAlignStyle = 'text-align: right;';
+            } else {
+                $textAlignStyle = 'text-align: left;';
+            }
+            
+            // Build font styles
+            $fontWeightStyle = $fontWeight === 'bold' ? 'font-weight: bold;' : 'font-weight: normal;';
+            $fontStyleCss = $fontStyle === 'italic' ? 'font-style: italic;' : 'font-style: normal;';
+            $textDecorationCss = $textDecoration === 'underline' ? 'text-decoration: underline;' : 'text-decoration: none;';
+            
+            // Use points for font size and ensure crisp rendering
+            // Position is already in mm, use it directly without any offset
             $style = sprintf(
-                'left: %smm; top: %smm; width: %smm; min-height: %smm; font-size: %spx; text-align: %s; padding: 2mm; overflow: visible; word-wrap: break-word; font-family: %s; color: %s; font-weight: %s; font-style: %s; text-decoration: %s;',
+                'position: absolute; left: %smm; top: %smm; width: %smm; min-height: %smm; font-size: %spt; %s padding: 0; margin: 0; overflow: visible; word-wrap: break-word; white-space: pre-wrap; font-family: %s; color: %s; %s %s %s line-height: 1.2; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; text-rendering: optimizeLegibility; box-sizing: border-box;',
                 $x,
                 $y,
                 $width,
                 $height,
-                $fontSize,
-                $textAlign,
+                $fontSizePt,
+                $textAlignStyle,
                 htmlspecialchars($fontFamily, ENT_QUOTES, 'UTF-8'),
                 htmlspecialchars($fontColor, ENT_QUOTES, 'UTF-8'),
-                htmlspecialchars($fontWeight, ENT_QUOTES, 'UTF-8'),
-                htmlspecialchars($fontStyle, ENT_QUOTES, 'UTF-8'),
-                htmlspecialchars($textDecoration, ENT_QUOTES, 'UTF-8')
+                $fontWeightStyle,
+                $fontStyleCss,
+                $textDecorationCss
             );
             
             $html .= sprintf(
@@ -525,6 +567,23 @@ class PdfTemplateService
         $options->set('defaultPaperHeight', $height . 'mm');
         // Note: Default font is set per field in the template, but we keep Arial as fallback
         $options->set('defaultFont', 'Arial');
+        // Optimize for speed: Use 150 DPI for faster generation (still good quality)
+        $options->set('dpi', 150); // 150 DPI for faster processing while maintaining good quality
+        $options->set('enableFontSubsetting', true);
+        $options->set('enableCssFloat', true);
+        $options->set('isJavascriptEnabled', false);
+        $options->set('isFontSubsettingEnabled', true);
+        // Optimize image handling
+        $options->set('isRemoteEnabled', true);
+        $options->set('debugKeepTemp', false);
+        $options->set('debugCss', false);
+        $options->set('debugLayout', false);
+        // Enable compression for faster downloads and smaller file sizes
+        $options->set('compress', true);
+        // Enable better image rendering
+        $options->set('enableHtml5Parser', true);
+        // Set image DPI to 200 for faster processing (reduced from 360)
+        $options->set('img_dpi', 200);
 
         $dompdf = new Dompdf($options);
         $dompdf->loadHtml($html);
