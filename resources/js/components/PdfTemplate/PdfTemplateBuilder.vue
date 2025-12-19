@@ -801,7 +801,7 @@ const updateFieldProperty = (field: Field, property: keyof Field, value: any) =>
             <Card class="flex-1 flex flex-col min-h-0">
                 <CardContent class="p-0 flex-1 overflow-hidden min-h-0">
                     <div class="flex justify-center items-center h-full overflow-auto p-4 rounded-lg">
-                        <div class="relative border-2 border-dashed border-gray-400 bg-white shadow-lg" 
+                        <div class="relative border-2 border-dashed border-gray-400 shadow-lg" 
                              ref="canvasRef"
                              :style="{ 
                                  width: scaledWidth + 'px', 
@@ -809,6 +809,7 @@ const updateFieldProperty = (field: Field, property: keyof Field, value: any) =>
                                  minWidth: scaledWidth + 'px',
                                  minHeight: scaledHeight + 'px',
                                  aspectRatio: (props.template.width / props.template.height).toString(),
+                                 backgroundColor: '#d4d4d4',
                              }">
                             <!-- PDF Background Canvas -->
                             <canvas
@@ -896,7 +897,7 @@ const updateFieldProperty = (field: Field, property: keyof Field, value: any) =>
         <Card class="h-full flex flex-col">
             <CardContent class="flex-1 overflow-auto p-0">
                 <div class="flex justify-center items-center h-full overflow-auto p-4 rounded-lg">
-                    <div class="relative border-2 border-dashed border-gray-400 bg-white shadow-lg" 
+                    <div class="relative border-2 border-dashed border-gray-400 shadow-lg" 
                          ref="canvasRef"
                          :style="{ 
                              width: scaledWidth + 'px', 
@@ -904,6 +905,7 @@ const updateFieldProperty = (field: Field, property: keyof Field, value: any) =>
                              minWidth: scaledWidth + 'px',
                              minHeight: scaledHeight + 'px',
                              aspectRatio: (props.template.width / props.template.height).toString(),
+                             backgroundColor: '#d4d4d4',
                          }">
                         <!-- PDF Background Canvas -->
                         <canvas

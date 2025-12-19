@@ -477,24 +477,6 @@ watch(showEditFieldDialog, (isOpen) => {
                             >
                                 {{ index + 1 }}
                             </Button>
-                            <Button
-                                v-if="template.pages.length < 10"
-                                size="sm"
-                                variant="outline"
-                                @click="addPage"
-                                title="Add Page"
-                            >
-                                <Plus class="h-4 w-4" />
-                            </Button>
-                            <Button
-                                v-if="template.pages.length > 1"
-                                size="sm"
-                                variant="outline"
-                                @click="deletePage(currentPageIndex)"
-                                title="Delete Current Page"
-                            >
-                                <X class="h-4 w-4" />
-                            </Button>
                         </div>
                     </div>
                     <Button
