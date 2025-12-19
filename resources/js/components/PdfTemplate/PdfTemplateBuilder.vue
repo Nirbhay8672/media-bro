@@ -800,7 +800,7 @@ const updateFieldProperty = (field: Field, property: keyof Field, value: any) =>
         <div class="lg:col-span-3 flex flex-col min-h-0">
             <Card class="flex-1 flex flex-col min-h-0">
                 <CardContent class="p-0 flex-1 overflow-hidden min-h-0">
-                    <div class="flex justify-center items-center h-full overflow-auto p-4 bg-gray-50 rounded-lg">
+                    <div class="flex justify-center items-center h-full overflow-auto p-4 rounded-lg">
                         <div class="relative border-2 border-dashed border-gray-400 bg-white shadow-lg" 
                              ref="canvasRef"
                              :style="{ 
@@ -815,7 +815,7 @@ const updateFieldProperty = (field: Field, property: keyof Field, value: any) =>
                                 v-if="props.pdfBackgroundUrl"
                                 ref="pdfCanvasRef"
                                 class="absolute inset-0 w-full h-full pointer-events-none"
-                                style="z-index: 1; object-fit: contain;"
+                                style="z-index: 1; object-fit: contain; background-color: #d4d4d4;"
                             />
                             <div
                                 v-if="pdfLoading"
@@ -895,7 +895,7 @@ const updateFieldProperty = (field: Field, property: keyof Field, value: any) =>
     <div v-else class="h-full">
         <Card class="h-full flex flex-col">
             <CardContent class="flex-1 overflow-auto p-0">
-                <div class="flex justify-center items-center h-full overflow-auto p-4 bg-gray-50 rounded-lg">
+                <div class="flex justify-center items-center h-full overflow-auto p-4 rounded-lg" style="background-color: #d4d4d4;">
                     <div class="relative border-2 border-dashed border-gray-400 bg-white shadow-lg" 
                          ref="canvasRef"
                          :style="{ 
