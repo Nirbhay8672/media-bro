@@ -52,10 +52,53 @@ class PdfTemplateController extends Controller
 
             // Check if file exists in request
             if (!$request->hasFile('pdf_file')) {
+                // Check if this is a PHP upload size limit issue
+                $contentLength = $request->header('Content-Length');
+                $uploadMaxFilesize = ini_get('upload_max_filesize');
+                $postMaxSize = ini_get('post_max_size');
+                
+                // Convert PHP size strings to bytes for comparison
+                $uploadMaxBytes = $this->convertPhpSizeToBytes($uploadMaxFilesize);
+                $postMaxBytes = $this->convertPhpSizeToBytes($postMaxSize);
+                
                 Log::warning('PDF Upload: No file in request', [
                     'all_input' => array_keys($request->all()),
                     'all_files' => array_keys($request->allFiles()),
+                    'content_length' => $contentLength,
+                    'upload_max_filesize' => $uploadMaxFilesize,
+                    'post_max_size' => $postMaxSize,
                 ]);
+                
+                // Check if file was too large for PHP
+                if ($contentLength && $contentLength > $uploadMaxBytes) {
+                    return response()->json([
+                        'message' => 'The pdf file failed to upload.',
+                        'errors' => [
+                            'pdf_file' => [
+                                sprintf(
+                                    'File size (%.2f MB) exceeds PHP upload_max_filesize limit (%s). Please increase upload_max_filesize in php.ini or contact your server administrator.',
+                                    $contentLength / 1024 / 1024,
+                                    $uploadMaxFilesize
+                                )
+                            ]
+                        ]
+                    ], 422);
+                }
+                
+                if ($contentLength && $contentLength > $postMaxBytes) {
+                    return response()->json([
+                        'message' => 'The pdf file failed to upload.',
+                        'errors' => [
+                            'pdf_file' => [
+                                sprintf(
+                                    'File size (%.2f MB) exceeds PHP post_max_size limit (%s). Please increase post_max_size in php.ini or contact your server administrator.',
+                                    $contentLength / 1024 / 1024,
+                                    $postMaxSize
+                                )
+                            ]
+                        ]
+                    ], 422);
+                }
                 
                 return response()->json([
                     'message' => 'The pdf file failed to upload.',
@@ -153,6 +196,29 @@ class PdfTemplateController extends Controller
                 ]
             ], 422);
         }
+    }
+
+    /**
+     * Convert PHP size string (e.g., "2M", "8M") to bytes
+     */
+    private function convertPhpSizeToBytes(string $size): int
+    {
+        $size = trim($size);
+        $last = strtolower($size[strlen($size) - 1]);
+        $value = (int) $size;
+        
+        switch ($last) {
+            case 'g':
+                $value *= 1024;
+                // no break
+            case 'm':
+                $value *= 1024;
+                // no break
+            case 'k':
+                $value *= 1024;
+        }
+        
+        return $value;
     }
 
     public function generatePdfs(Request $request)
