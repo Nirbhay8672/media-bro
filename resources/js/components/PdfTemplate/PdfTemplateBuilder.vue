@@ -895,7 +895,7 @@ const updateFieldProperty = (field: Field, property: keyof Field, value: any) =>
     <div v-else class="h-full">
         <Card class="h-full flex flex-col">
             <CardContent class="flex-1 overflow-auto p-0">
-                <div class="flex justify-center items-center h-full overflow-auto p-4 rounded-lg" style="background-color: #d4d4d4;">
+                <div class="flex justify-center items-center h-full overflow-auto p-4 rounded-lg">
                     <div class="relative border-2 border-dashed border-gray-400 bg-white shadow-lg" 
                          ref="canvasRef"
                          :style="{ 
