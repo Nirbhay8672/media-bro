@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import AppLayout from '@/layouts/AppLayout.vue';
 import { Head } from '@inertiajs/vue3';
-import { ref, computed, watch } from 'vue';
+import { ref, computed, watch, onBeforeUnmount, nextTick } from 'vue';
 import PdfTemplateBuilder from '@/components/PdfTemplate/PdfTemplateBuilder.vue';
 import ExcelUploader from '@/components/PdfTemplate/ExcelUploader.vue';
 import PdfUploader from '@/components/PdfTemplate/PdfUploader.vue';
@@ -78,6 +78,7 @@ const columnMapping = ref<Record<string, string>>({});
 const generatedPdfs = ref<any[]>([]);
 const isGenerating = ref(false);
 const showPreviewModal = ref(false);
+const pdfPreviewUrl = ref<string | null>(null);
 const showFieldDialog = ref(false);
 const showEditFieldDialog = ref(false);
 const showExcelViewModal = ref(false);
@@ -102,6 +103,66 @@ const currentPageIndex = ref(0);
 const currentPage = computed(() => template.value.pages[currentPageIndex.value] || template.value.pages[0]);
 const hasTemplate = computed(() => template.value.pages.some(page => page.fields.length > 0));
 const hasExcelData = computed(() => excelData.value.length > 0);
+const globalLoading = ref(false);
+const loadingMessage = ref('Processing...');
+const loadingType = ref<'upload' | 'generate' | 'download' | 'pdf-load' | 'default'>('default');
+let generateAbortController: AbortController | null = null;
+let generateTimeoutId: NodeJS.Timeout | null = null;
+let progressUpdateInterval: NodeJS.Timeout | null = null;
+const pdfUploaderRef = ref<ComponentPublicInstance | null>(null);
+const excelUploaderRef = ref<ComponentPublicInstance | null>(null);
+
+const cancelPdfGeneration = () => {
+    if (generateAbortController) {
+        generateAbortController.abort();
+        generateAbortController = null;
+    }
+    isGenerating.value = false;
+    globalLoading.value = false;
+    loadingType.value = 'default';
+    loadingMessage.value = 'Processing...';
+    
+    if (progressUpdateInterval) {
+        clearInterval(progressUpdateInterval);
+        progressUpdateInterval = null;
+    }
+    if (generateTimeoutId) {
+        clearTimeout(generateTimeoutId);
+        generateTimeoutId = null;
+    }
+};
+
+const cancelUpload = () => {
+    // Try to call cancel method on uploader components
+    if (pdfUploaderRef.value && typeof (pdfUploaderRef.value as any).cancelUpload === 'function') {
+        (pdfUploaderRef.value as any).cancelUpload();
+    }
+    if (excelUploaderRef.value && typeof (excelUploaderRef.value as any).cancelUpload === 'function') {
+        (excelUploaderRef.value as any).cancelUpload();
+    }
+};
+
+// Ensure loading state is reset on component unmount
+onBeforeUnmount(() => {
+    if (globalLoading.value) {
+        globalLoading.value = false;
+    }
+    // Clean up any pending requests
+    if (generateAbortController) {
+        generateAbortController.abort();
+    }
+    if (generateTimeoutId) {
+        clearTimeout(generateTimeoutId);
+    }
+    if (progressUpdateInterval) {
+        clearInterval(progressUpdateInterval);
+    }
+    // Clean up blob URL
+    if (pdfPreviewUrl.value) {
+        URL.revokeObjectURL(pdfPreviewUrl.value);
+        pdfPreviewUrl.value = null;
+    }
+});
 
 // Page management functions
 const addPage = () => {
@@ -146,6 +207,13 @@ const handlePdfUpload = (data: any) => {
         template.value.width = data.dimensions.width || A4_WIDTH;
         template.value.height = data.dimensions.height || A4_HEIGHT;
     }
+};
+
+// Expose loading state to child components
+const setGlobalLoading = (loading: boolean, message: string = 'Processing...', type: 'upload' | 'generate' | 'download' | 'pdf-load' | 'default' = 'default') => {
+    globalLoading.value = loading;
+    loadingMessage.value = message;
+    loadingType.value = type;
 };
 
 const handlePdfImageConverted = (base64: string | string[]) => {
@@ -255,7 +323,28 @@ const generatePdfs = async () => {
         return;
     }
 
+    // Cancel any previous request
+    if (generateAbortController) {
+        generateAbortController.abort();
+    }
+    if (generateTimeoutId) {
+        clearTimeout(generateTimeoutId);
+        generateTimeoutId = null;
+    }
+    if (progressUpdateInterval) {
+        clearInterval(progressUpdateInterval);
+        progressUpdateInterval = null;
+    }
+    
+    // Create new abort controller
+    generateAbortController = new AbortController();
+    
+    // Set loading state
     isGenerating.value = true;
+    globalLoading.value = true;
+    loadingMessage.value = 'Generating PDFs...';
+    loadingType.value = 'generate';
+    
     try {
         const response = await axios.post('/pdf-templates/generate', {
             template: template.value,
@@ -263,17 +352,99 @@ const generatePdfs = async () => {
             column_mapping: columnMapping.value,
             pdf_file_path: uploadedPdfPath.value || null,
             pdf_page_image: pdfPageImageBase64.value || null,
+        }, {
+            timeout: 600000, // 10 minutes timeout
+            signal: generateAbortController.signal,
         });
 
-        generatedPdfs.value = response.data.pdfs || [];
-        // Open preview modal after successful generation
-        if (generatedPdfs.value.length > 0) {
-            showPreviewModal.value = true;
+        // Process successful response
+        if (!response.data) {
+            throw new Error('No data received from server');
         }
-    } catch (error: any) {
-        alert('Error generating PDFs: ' + (error.response?.data?.message || error.message));
-    } finally {
+
+        // Get PDFs from response
+        const pdfsData = response.data.pdfs || [];
+        generatedPdfs.value = Array.isArray(pdfsData) ? pdfsData : [];
+        
+        if (!Array.isArray(generatedPdfs.value)) {
+            throw new Error('Invalid response format from server');
+        }
+        
+        // Create blob URL for preview if PDFs exist
+        if (generatedPdfs.value.length > 0 && generatedPdfs.value[0]?.base64) {
+            try {
+                // Clean up previous blob URL
+                if (pdfPreviewUrl.value) {
+                    URL.revokeObjectURL(pdfPreviewUrl.value);
+                }
+                
+                const byteCharacters = atob(generatedPdfs.value[0].base64);
+                const byteNumbers = new Array(byteCharacters.length);
+                for (let i = 0; i < byteCharacters.length; i++) {
+                    byteNumbers[i] = byteCharacters.charCodeAt(i);
+                }
+                const byteArray = new Uint8Array(byteNumbers);
+                const blob = new Blob([byteArray], { type: 'application/pdf' });
+                pdfPreviewUrl.value = URL.createObjectURL(blob);
+            } catch (error) {
+                console.error('Error creating blob URL:', error);
+                pdfPreviewUrl.value = null;
+            }
+        }
+        
+        // Close loading modal
         isGenerating.value = false;
+        globalLoading.value = false;
+        loadingType.value = 'default';
+        loadingMessage.value = 'Processing...';
+        
+        // Open preview modal
+        if (generatedPdfs.value.length > 0) {
+            await nextTick();
+            showPreviewModal.value = true;
+        } else {
+            alert('No PDFs were generated. Please check your template and data.');
+        }
+        
+    } catch (error: any) {
+        // Don't show error if request was cancelled
+        if (axios.isCancel(error) || error.name === 'AbortError' || error.code === 'ERR_CANCELED') {
+            console.log('PDF generation was cancelled');
+            return;
+        }
+        
+        console.error('PDF Generation Error:', error);
+        
+        let errorMessage = 'Error generating PDFs. ';
+        
+        if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
+            errorMessage += 'The request timed out. Please try again with fewer rows.';
+        } else if (error.response) {
+            errorMessage += error.response.data?.message || `Server error (${error.response.status})`;
+        } else if (error.request) {
+            errorMessage += 'No response from server. Please check your connection.';
+        } else {
+            errorMessage += error.message || 'Unknown error occurred';
+        }
+        
+        alert(errorMessage);
+    } finally {
+        // Always reset loading state
+        isGenerating.value = false;
+        globalLoading.value = false;
+        loadingType.value = 'default';
+        loadingMessage.value = 'Processing...';
+        
+        // Cleanup
+        if (progressUpdateInterval) {
+            clearInterval(progressUpdateInterval);
+            progressUpdateInterval = null;
+        }
+        if (generateTimeoutId) {
+            clearTimeout(generateTimeoutId);
+            generateTimeoutId = null;
+        }
+        generateAbortController = null;
     }
 };
 
@@ -310,13 +481,27 @@ const downloadPdfFromBase64 = (pdf: { filename: string; base64: string }) => {
     }
 };
 
-const downloadAllPdfs = () => {
+
+const downloadAllPdfs = async () => {
+    if (generatedPdfs.value.length === 0) return;
+    
+    globalLoading.value = true;
+    loadingMessage.value = `Downloading PDFs (0/${generatedPdfs.value.length})...`;
+    loadingType.value = 'download';
+    
+    try {
     // Download all PDFs with minimal delay for faster batch downloads
-    generatedPdfs.value.forEach((pdf: any, index: number) => {
-        setTimeout(() => {
-            downloadPdfFromBase64(pdf);
-        }, index * 50); // Reduced delay from 100ms to 50ms
-    });
+        for (let index = 0; index < generatedPdfs.value.length; index++) {
+            loadingMessage.value = `Downloading PDFs (${index + 1}/${generatedPdfs.value.length})...`;
+            downloadPdfFromBase64(generatedPdfs.value[index]);
+            // Small delay to prevent browser from blocking multiple downloads
+            if (index < generatedPdfs.value.length - 1) {
+                await new Promise(resolve => setTimeout(resolve, 100));
+            }
+        }
+    } finally {
+        globalLoading.value = false;
+    }
 };
 
 const canAddField = computed(() => {
@@ -450,13 +635,348 @@ watch(showEditFieldDialog, (isOpen) => {
         };
     }
 });
+
 </script>
 
 <template>
     <Head title="PDF Template" />
 
     <AppLayout>
-        <div class="h-[calc(100vh-4rem)] flex flex-col p-4 overflow-hidden">
+        <!-- Global Loading Overlay - Bootstrap Modal Style -->
+        <Transition
+            enter-active-class="transition-opacity duration-300 ease-out"
+            enter-from-class="opacity-0"
+            enter-to-class="opacity-100"
+            leave-active-class="transition-opacity duration-200 ease-in"
+            leave-from-class="opacity-100"
+            leave-to-class="opacity-0"
+        >
+            <div
+                v-if="globalLoading"
+                class="fixed inset-0 z-[9999] flex items-center justify-center"
+                style="pointer-events: all;"
+                @click.stop
+                @mousedown.stop
+                @touchstart.stop
+            >
+                <!-- Backdrop with fade effect -->
+                <div 
+                    class="absolute inset-0 bg-black transition-opacity duration-300"
+                    :class="globalLoading ? 'opacity-50' : 'opacity-0'"
+                    style="backdrop-filter: blur(2px);"
+                ></div>
+                
+                <!-- Modal Content -->
+                <div class="relative z-10">
+                    <div class="bg-white rounded-lg p-8 shadow-2xl max-w-md w-full mx-4 border border-gray-200">
+                        <div class="flex flex-col items-center space-y-6">
+                    <!-- Upload Animation -->
+                    <div v-if="loadingType === 'upload'" class="w-24 h-24">
+                        <svg viewBox="0 0 100 100" class="w-full h-full">
+                            <!-- Cloud with gradient fill -->
+                            <defs>
+                                <linearGradient id="cloudGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                                    <stop offset="0%" style="stop-color:#60a5fa;stop-opacity:1" />
+                                    <stop offset="100%" style="stop-color:#3b82f6;stop-opacity:1" />
+                                </linearGradient>
+                            </defs>
+                            <path
+                                d="M 30 50 Q 20 50 20 60 Q 20 70 30 70 L 70 70 Q 80 70 80 60 Q 80 50 70 50"
+                                fill="url(#cloudGradient)"
+                                stroke="#2563eb"
+                                stroke-width="2"
+                                class="animate-pulse"
+                            />
+                            <!-- Arrow going up with vibrant colors -->
+                            <line
+                                x1="50"
+                                y1="40"
+                                x2="50"
+                                y2="25"
+                                stroke="#10b981"
+                                stroke-width="5"
+                                stroke-linecap="round"
+                                class="animate-bounce"
+                            />
+                            <polyline
+                                points="45,30 50,25 55,30"
+                                fill="#10b981"
+                                stroke="#10b981"
+                                stroke-width="5"
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                                class="animate-bounce"
+                            />
+                            <!-- Decorative dots -->
+                            <circle cx="30" cy="60" r="2" fill="#fbbf24" class="animate-pulse" style="animation-delay: 0.2s;" />
+                            <circle cx="70" cy="60" r="2" fill="#f59e0b" class="animate-pulse" style="animation-delay: 0.4s;" />
+                        </svg>
+                    </div>
+                    
+                    <!-- PDF Generation Animation -->
+                    <div v-else-if="loadingType === 'generate'" class="w-24 h-24 relative">
+                        <svg viewBox="0 0 100 100" class="w-full h-full">
+                            <defs>
+                                <linearGradient id="pdfGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                                    <stop offset="0%" style="stop-color:#60a5fa;stop-opacity:0.2" />
+                                    <stop offset="100%" style="stop-color:#3b82f6;stop-opacity:0.3" />
+                                </linearGradient>
+                                <linearGradient id="textGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                                    <stop offset="0%" style="stop-color:#34d399;stop-opacity:1" />
+                                    <stop offset="100%" style="stop-color:#10b981;stop-opacity:1" />
+                                </linearGradient>
+                                <linearGradient id="imageGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                                    <stop offset="0%" style="stop-color:#fbbf24;stop-opacity:1" />
+                                    <stop offset="100%" style="stop-color:#f59e0b;stop-opacity:1" />
+                                </linearGradient>
+                            </defs>
+                            <!-- Document/PDF icon in center with gradient -->
+                            <rect
+                                x="25"
+                                y="15"
+                                width="50"
+                                height="70"
+                                rx="2"
+                                fill="url(#pdfGradient)"
+                                stroke="#3b82f6"
+                                stroke-width="3"
+                                class="animate-pulse"
+                            />
+                            <!-- Text lines in PDF with colors -->
+                            <line
+                                x1="35"
+                                y1="30"
+                                x2="65"
+                                y2="30"
+                                stroke="#6366f1"
+                                stroke-width="2.5"
+                                class="animate-pulse"
+                            />
+                            <line
+                                x1="35"
+                                y1="45"
+                                x2="60"
+                                y2="45"
+                                stroke="#8b5cf6"
+                                stroke-width="2.5"
+                                class="animate-pulse"
+                                style="animation-delay: 0.2s;"
+                            />
+                            <line
+                                x1="35"
+                                y1="60"
+                                x2="55"
+                                y2="60"
+                                stroke="#a855f7"
+                                stroke-width="2.5"
+                                class="animate-pulse"
+                                style="animation-delay: 0.4s;"
+                            />
+                            <!-- Converting elements (text icon on left) with gradient -->
+                            <g class="animate-bounce" style="animation-duration: 1.5s;">
+                                <rect x="8" y="32" width="10" height="10" rx="1.5" fill="url(#textGradient)" stroke="#059669" stroke-width="1" />
+                                <line x1="10" y1="36" x2="16" y2="36" stroke="white" stroke-width="1.5" />
+                                <line x1="10" y1="39" x2="16" y2="39" stroke="white" stroke-width="1.5" />
+                            </g>
+                            <!-- Converting elements (image icon on left) with gradient -->
+                            <g class="animate-bounce" style="animation-duration: 1.5s; animation-delay: 0.3s;">
+                                <rect x="8" y="48" width="10" height="10" rx="1.5" fill="url(#imageGradient)" stroke="#d97706" stroke-width="1" />
+                                <circle cx="13" cy="53" r="2.5" fill="white" />
+                                <circle cx="11" cy="51" r="1" fill="#fef3c7" />
+                            </g>
+                            <!-- Arrows pointing to PDF (left side) with vibrant colors -->
+                            <g class="animate-pulse" style="animation-duration: 1.5s;">
+                                <line x1="20" y1="37" x2="25" y2="37" stroke="#10b981" stroke-width="3" stroke-linecap="round" />
+                                <polyline points="23,35 25,37 23,39" fill="#10b981" stroke="#10b981" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
+                                <line x1="20" y1="53" x2="25" y2="53" stroke="#f59e0b" stroke-width="3" stroke-linecap="round" />
+                                <polyline points="23,51 25,53 23,55" fill="#f59e0b" stroke="#f59e0b" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
+                            </g>
+                            <!-- Converting elements (text icon on right) with gradient -->
+                            <g class="animate-bounce" style="animation-duration: 1.5s; animation-delay: 0.5s;">
+                                <rect x="82" y="32" width="10" height="10" rx="1.5" fill="url(#textGradient)" stroke="#059669" stroke-width="1" />
+                                <line x1="84" y1="36" x2="90" y2="36" stroke="white" stroke-width="1.5" />
+                                <line x1="84" y1="39" x2="90" y2="39" stroke="white" stroke-width="1.5" />
+                            </g>
+                            <!-- Converting elements (image icon on right) with gradient -->
+                            <g class="animate-bounce" style="animation-duration: 1.5s; animation-delay: 0.8s;">
+                                <rect x="82" y="48" width="10" height="10" rx="1.5" fill="url(#imageGradient)" stroke="#d97706" stroke-width="1" />
+                                <circle cx="87" cy="53" r="2.5" fill="white" />
+                                <circle cx="85" cy="51" r="1" fill="#fef3c7" />
+                            </g>
+                            <!-- Arrows pointing to PDF (right side) with vibrant colors -->
+                            <g class="animate-pulse" style="animation-duration: 1.5s; animation-delay: 0.5s;">
+                                <line x1="75" y1="37" x2="70" y2="37" stroke="#10b981" stroke-width="3" stroke-linecap="round" />
+                                <polyline points="72,35 70,37 72,39" fill="#10b981" stroke="#10b981" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
+                                <line x1="75" y1="53" x2="70" y2="53" stroke="#f59e0b" stroke-width="3" stroke-linecap="round" />
+                                <polyline points="72,51 70,53 72,55" fill="#f59e0b" stroke="#f59e0b" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
+                            </g>
+                        </svg>
+                    </div>
+                    
+                    <!-- Download Animation -->
+                    <div v-else-if="loadingType === 'download'" class="w-24 h-24">
+                        <svg viewBox="0 0 100 100" class="w-full h-full">
+                            <defs>
+                                <linearGradient id="downloadGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                                    <stop offset="0%" style="stop-color:#10b981;stop-opacity:1" />
+                                    <stop offset="100%" style="stop-color:#059669;stop-opacity:1" />
+                                </linearGradient>
+                                <linearGradient id="docGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                                    <stop offset="0%" style="stop-color:#3b82f6;stop-opacity:0.4" />
+                                    <stop offset="100%" style="stop-color:#2563eb;stop-opacity:0.6" />
+                                </linearGradient>
+                            </defs>
+                            <!-- Arrow going down with gradient -->
+                            <line
+                                x1="50"
+                                y1="25"
+                                x2="50"
+                                y2="60"
+                                stroke="url(#downloadGradient)"
+                                stroke-width="5"
+                                stroke-linecap="round"
+                                class="animate-bounce"
+                            />
+                            <polyline
+                                points="45,55 50,60 55,55"
+                                fill="url(#downloadGradient)"
+                                stroke="url(#downloadGradient)"
+                                stroke-width="5"
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                                class="animate-bounce"
+                            />
+                            <!-- Document at bottom with gradient -->
+                            <rect
+                                x="35"
+                                y="65"
+                                width="30"
+                                height="20"
+                                rx="2"
+                                fill="url(#docGradient)"
+                                stroke="#3b82f6"
+                                stroke-width="2"
+                                class="animate-pulse"
+                            />
+                            <!-- Decorative lines in document -->
+                            <line x1="40" y1="72" x2="60" y2="72" stroke="#60a5fa" stroke-width="1.5" class="animate-pulse" />
+                            <line x1="40" y1="78" x2="55" y2="78" stroke="#60a5fa" stroke-width="1.5" class="animate-pulse" style="animation-delay: 0.2s;" />
+                        </svg>
+                    </div>
+                    
+                    <!-- PDF Loading Animation -->
+                    <div v-else-if="loadingType === 'pdf-load'" class="w-24 h-24">
+                        <svg viewBox="0 0 100 100" class="w-full h-full">
+                            <defs>
+                                <linearGradient id="page1Gradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                                    <stop offset="0%" style="stop-color:#c084fc;stop-opacity:0.3" />
+                                    <stop offset="100%" style="stop-color:#a855f7;stop-opacity:0.4" />
+                                </linearGradient>
+                                <linearGradient id="page2Gradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                                    <stop offset="0%" style="stop-color:#818cf8;stop-opacity:0.4" />
+                                    <stop offset="100%" style="stop-color:#6366f1;stop-opacity:0.5" />
+                                </linearGradient>
+                                <linearGradient id="page3Gradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                                    <stop offset="0%" style="stop-color:#60a5fa;stop-opacity:0.5" />
+                                    <stop offset="100%" style="stop-color:#3b82f6;stop-opacity:0.6" />
+                                </linearGradient>
+                            </defs>
+                            <!-- PDF pages stacking with gradients -->
+                            <rect
+                                x="25"
+                                y="20"
+                                width="50"
+                                height="60"
+                                rx="2"
+                                fill="url(#page1Gradient)"
+                                stroke="#a855f7"
+                                stroke-width="2"
+                                class="animate-pulse"
+                                style="animation-delay: 0.4s;"
+                            />
+                            <rect
+                                x="27"
+                                y="22"
+                                width="50"
+                                height="60"
+                                rx="2"
+                                fill="url(#page2Gradient)"
+                                stroke="#6366f1"
+                                stroke-width="2"
+                                class="animate-pulse"
+                                style="animation-delay: 0.2s;"
+                            />
+                            <rect
+                                x="29"
+                                y="24"
+                                width="50"
+                                height="60"
+                                rx="2"
+                                fill="url(#page3Gradient)"
+                                stroke="#3b82f6"
+                                stroke-width="3"
+                                class="animate-pulse"
+                            />
+                            <!-- Text lines on top page -->
+                            <line x1="35" y1="35" x2="65" y2="35" stroke="#60a5fa" stroke-width="2" class="animate-pulse" />
+                            <line x1="35" y1="45" x2="60" y2="45" stroke="#818cf8" stroke-width="2" class="animate-pulse" style="animation-delay: 0.2s;" />
+                            <line x1="35" y1="55" x2="55" y2="55" stroke="#a855f7" stroke-width="2" class="animate-pulse" style="animation-delay: 0.4s;" />
+                        </svg>
+                    </div>
+                    
+                    <!-- Default Spinner -->
+                    <div v-else class="relative w-12 h-12">
+                        <svg class="animate-spin w-12 h-12" viewBox="0 0 24 24">
+                            <defs>
+                                <linearGradient id="spinnerGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                                    <stop offset="0%" style="stop-color:#3b82f6;stop-opacity:1" />
+                                    <stop offset="25%" style="stop-color:#8b5cf6;stop-opacity:1" />
+                                    <stop offset="50%" style="stop-color:#ec4899;stop-opacity:1" />
+                                    <stop offset="75%" style="stop-color:#f59e0b;stop-opacity:1" />
+                                    <stop offset="100%" style="stop-color:#10b981;stop-opacity:1" />
+                                </linearGradient>
+                            </defs>
+                            <circle
+                                cx="12"
+                                cy="12"
+                                r="10"
+                                fill="none"
+                                stroke="url(#spinnerGradient)"
+                                stroke-width="3"
+                                stroke-linecap="round"
+                                stroke-dasharray="60"
+                                stroke-dashoffset="15"
+                            />
+                        </svg>
+                    </div>
+                    
+                    <p class="text-gray-700 font-medium text-center text-lg">{{ loadingMessage }}</p>
+                    <!-- Progress indicator and cancel buttons -->
+                    <div v-if="loadingType === 'generate' || loadingType === 'upload'" class="w-full max-w-xs mt-4 space-y-3">
+                        <div v-if="loadingType === 'generate'" class="h-2 bg-gray-200 rounded-full overflow-hidden">
+                            <div class="h-full bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 rounded-full animate-pulse" style="width: 100%; background-size: 200% 100%; background-image: linear-gradient(90deg, #3b82f6 0%, #8b5cf6 50%, #ec4899 100%); animation: shimmer 2s ease-in-out infinite;"></div>
+                        </div>
+                        <!-- Cancel button -->
+                        <Button
+                            @click="loadingType === 'generate' ? cancelPdfGeneration() : cancelUpload()"
+                            variant="outline"
+                            size="sm"
+                            class="w-full"
+                        >
+                            {{ loadingType === 'generate' ? 'Cancel Generation' : 'Cancel Upload' }}
+                        </Button>
+                    </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </Transition>
+        
+        <div 
+            class="h-[calc(100vh-4rem)] flex flex-col p-4 overflow-hidden" 
+            :class="{ 'pointer-events-none': globalLoading }"
+            :style="globalLoading ? { 'user-select': 'none' } : {}"
+        >
             <!-- Header -->
             <div class="flex items-center justify-between mb-4 flex-shrink-0">
                 <div>
@@ -657,9 +1177,11 @@ watch(showEditFieldDialog, (isOpen) => {
                         <div class="border-t pt-4">
                             <Label class="text-base font-semibold mb-3 block">Upload PDF Template</Label>
                             <PdfUploader
+                                ref="pdfUploaderRef"
                                 @uploaded="handlePdfUpload"
                                 :pdf-url="uploadedPdfUrl"
                                 :no-card="true"
+                                @loading="(loading, message) => { globalLoading = loading; loadingMessage = message || 'Processing...'; loadingType = loading ? 'upload' : 'default'; }"
                             />
                         </div>
 
@@ -667,10 +1189,12 @@ watch(showEditFieldDialog, (isOpen) => {
                         <div class="border-t pt-4">
                             <Label class="text-base font-semibold mb-3 block">Upload Excel</Label>
                             <ExcelUploader
+                                ref="excelUploaderRef"
                                 @uploaded="handleExcelUpload"
                                 :excel-data="excelData"
                                 :no-card="true"
                                 @view-file="showExcelViewModal = true"
+                                @loading="(loading, message) => { globalLoading = loading; loadingMessage = message || 'Processing...'; loadingType = loading ? 'upload' : 'default'; }"
                             />
                         </div>
                     </CardContent>
@@ -798,6 +1322,7 @@ watch(showEditFieldDialog, (isOpen) => {
                         @field-selected="selectField"
                         @pdf-image-converted="handlePdfImageConverted"
                         @pdf-pages-detected="handlePdfPagesDetected"
+                        @loading="(loading, message) => { globalLoading = loading; loadingMessage = message || 'Processing...'; loadingType = loading ? 'pdf-load' : 'default'; }"
                     />
                 </div>
             </div>
@@ -815,13 +1340,40 @@ watch(showEditFieldDialog, (isOpen) => {
                         No PDFs generated yet.
                     </div>
                     <div v-else class="space-y-4">
+                        <!-- PDF Preview -->
                         <div class="border rounded-lg overflow-hidden">
                             <div class="bg-white">
                                 <div class="aspect-[1/1.414] w-full" style="min-height: 600px;">
+                                    <!-- Try blob URL first (more reliable) -->
                                     <iframe
+                                        v-if="pdfPreviewUrl"
+                                        :src="pdfPreviewUrl"
+                                        class="w-full h-full border-0"
+                                        @error="(e) => { console.error('PDF iframe error:', e); }"
+                                        @load="() => { console.log('PDF iframe loaded successfully'); }"
+                                    ></iframe>
+                                    <!-- Fallback to data URI -->
+                                    <iframe
+                                        v-else-if="generatedPdfs[0]?.base64"
                                         :src="`data:application/pdf;base64,${generatedPdfs[0].base64}`"
                                         class="w-full h-full border-0"
+                                        @error="(e) => { console.error('PDF iframe error:', e); }"
+                                        @load="() => { console.log('PDF iframe loaded successfully'); }"
                                     ></iframe>
+                                    <!-- Fallback to object tag -->
+                                    <object
+                                        v-else-if="generatedPdfs[0]?.base64"
+                                        :data="`data:application/pdf;base64,${generatedPdfs[0].base64}`"
+                                        type="application/pdf"
+                                        class="w-full h-full border-0"
+                                    >
+                                        <p class="flex items-center justify-center h-full text-gray-500">
+                                            PDF cannot be displayed. <a :href="`data:application/pdf;base64,${generatedPdfs[0].base64}`" download="preview.pdf" class="text-blue-500 underline ml-2">Download instead</a>
+                                        </p>
+                                    </object>
+                                    <div v-else class="flex items-center justify-center h-full text-red-500">
+                                        <p>PDF data is missing</p>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -896,4 +1448,14 @@ watch(showEditFieldDialog, (isOpen) => {
     </AppLayout>
 </template>
 
+<style scoped>
+@keyframes shimmer {
+    0% {
+        background-position: -200% 0;
+    }
+    100% {
+        background-position: 200% 0;
+    }
+}
+</style>
 

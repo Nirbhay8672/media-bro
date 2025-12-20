@@ -50,6 +50,7 @@ const emit = defineEmits<{
     fieldSelected: [field: Field | null];
     pdfImageConverted: [base64: string | string[]]; // Can be single image or array of images for multiple pages
     pdfPagesDetected: [numPages: number]; // Emit when PDF pages are detected
+    loading: [loading: boolean, message?: string]; // Emit loading state
 }>();
 
 const canvasRef = ref<HTMLElement | null>(null);
@@ -61,6 +62,7 @@ const pdfDocument = ref<any>(null); // Store the PDF document
 const pdfLoadingTask = ref<any>(null); // Store the loading task
 const cachedPageImages = ref<Map<number, HTMLImageElement>>(new Map()); // Cache all page images
 const cachedPageCanvases = ref<Map<number, HTMLCanvasElement>>(new Map()); // Cache all page canvases
+const allPagesLoaded = ref(false); // Track if all pages have been pre-loaded
 
 // Watch for external selection changes
 watch(() => props.selectedFieldId, (newId) => {
@@ -356,94 +358,102 @@ const loadPdf = async () => {
     }
 };
 
-const renderPdf = async () => {
-    if (!props.pdfBackgroundUrl || !pdfCanvasRef.value || !window.pdfjsLib) {
+// Pre-load all pages when PDF is first loaded
+const preloadAllPages = async (pdf: any) => {
+    if (!pdf || !pdfCanvasRef.value) {
         return;
     }
     
     try {
-        // Use stored PDF document if available, otherwise load it
-        let pdf = pdfDocument.value;
-        if (!pdf || !pdfLoadingTask.value) {
-            // Create new loading task
-            const loadingTask = window.pdfjsLib.getDocument({
-                url: props.pdfBackgroundUrl,
-                withCredentials: false
-            });
-            pdfLoadingTask.value = loadingTask;
-            pdf = await loadingTask.promise;
-            pdfDocument.value = pdf; // Store for future use
-            
-            // Emit the number of pages detected when PDF is first loaded
-            emit('pdfPagesDetected', pdf.numPages);
-        }
-        
-        // Verify PDF document is still valid
-        if (!pdf) {
-            throw new Error('PDF document is not loaded');
-        }
-        
-        // Ensure PDF is fully loaded by checking numPages
-        if (!pdf.numPages || pdf.numPages === 0) {
-            throw new Error('PDF document is not fully loaded');
-        }
-        
-        // Get the current page to display (default to page 1)
-        const pageNumberToDisplay = props.currentPageNumber || 1;
-        const pageNumber = Math.min(Math.max(1, pageNumberToDisplay), pdf.numPages);
-        
-        // Get the page with error handling
-        let page;
-        try {
-            page = await pdf.getPage(pageNumber);
-        } catch (pageError: any) {
-            // If page access fails, reload the PDF from scratch
-            pdfDocument.value = null;
-            pdfLoadingTask.value = null;
-            
-            const loadingTask = window.pdfjsLib.getDocument({
-                url: props.pdfBackgroundUrl,
-                withCredentials: false
-            });
-            pdfLoadingTask.value = loadingTask;
-            pdf = await loadingTask.promise;
-            pdfDocument.value = pdf;
-            
-            // Try getting the page again
-            page = await pdf.getPage(pageNumber);
-        }
-        const viewport = page.getViewport({ scale: 1.0 });
-        
-        const canvas = pdfCanvasRef.value;
-        const context = canvas.getContext('2d');
-        
-        if (!context) {
-            throw new Error('Could not get canvas context');
-        }
-        
-        // Set canvas size to match template dimensions (in pixels)
+        emit('loading', true, `Loading PDF pages (0/${pdf.numPages})...`);
         const mmToPx = 3.779527559;
         const templateWidthPx = props.template.width * mmToPx * scale.value;
         const templateHeightPx = props.template.height * mmToPx * scale.value;
         
-        // Calculate scale to fit PDF in canvas while maintaining aspect ratio
-        const scaleX = templateWidthPx / viewport.width;
-        const scaleY = templateHeightPx / viewport.height;
-        const fitScale = Math.min(scaleX, scaleY);
+        // Clear existing cache
+        cachedPageCanvases.value.clear();
+        cachedPageImages.value.clear();
         
-        const scaledViewport = page.getViewport({ scale: fitScale });
+        // Pre-render all pages to separate canvases
+        for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+            emit('loading', true, `Loading PDF pages (${pageNum}/${pdf.numPages})...`);
+            const page = await pdf.getPage(pageNum);
+            const viewport = page.getViewport({ scale: 1.0 });
+            
+            // Calculate scale to fit PDF in canvas while maintaining aspect ratio
+            const scaleX = templateWidthPx / viewport.width;
+            const scaleY = templateHeightPx / viewport.height;
+            const fitScale = Math.min(scaleX, scaleY);
+            
+            const scaledViewport = page.getViewport({ scale: fitScale });
+            
+            // Create a canvas for this page
+            const pageCanvas = document.createElement('canvas');
+            pageCanvas.width = scaledViewport.width;
+            pageCanvas.height = scaledViewport.height;
+            
+            const pageContext = pageCanvas.getContext('2d');
+            if (!pageContext) {
+                throw new Error('Could not get canvas context');
+            }
+            
+            const renderContext = {
+                canvasContext: pageContext,
+                viewport: scaledViewport
+            };
+            
+            await page.render(renderContext).promise;
+            
+            // Cache the canvas
+            cachedPageCanvases.value.set(pageNum, pageCanvas);
+        }
         
-        canvas.width = scaledViewport.width;
-        canvas.height = scaledViewport.height;
+        allPagesLoaded.value = true;
         
-        const renderContext = {
-            canvasContext: context,
-            viewport: scaledViewport
-        };
+        // Now render the current page from cache
+        renderCurrentPageFromCache();
         
-        await page.render(renderContext).promise;
+        // Clear loading state after pages are loaded
+        emit('loading', false);
         
-        // Convert all pages to images for export
+        // Convert all pages to images for export (in background, don't block)
+        convertAllPagesToImages(pdf);
+    } catch (error: any) {
+        console.error('Error preloading pages:', error);
+        pdfError.value = 'Failed to preload PDF pages: ' + (error.message || 'Unknown error');
+        pdfLoading.value = false;
+        emit('loading', false);
+    }
+};
+
+// Render current page from cache
+const renderCurrentPageFromCache = () => {
+    if (!pdfCanvasRef.value) {
+        return;
+    }
+    
+    const pageNumberToDisplay = props.currentPageNumber || 1;
+    const cachedCanvas = cachedPageCanvases.value.get(pageNumberToDisplay);
+    
+    if (cachedCanvas && pdfCanvasRef.value) {
+        const displayCanvas = pdfCanvasRef.value;
+        const context = displayCanvas.getContext('2d');
+        
+        if (context) {
+            // Set canvas size to match cached canvas
+            displayCanvas.width = cachedCanvas.width;
+            displayCanvas.height = cachedCanvas.height;
+            
+            // Draw the cached canvas
+            context.clearRect(0, 0, displayCanvas.width, displayCanvas.height);
+            context.drawImage(cachedCanvas, 0, 0);
+        }
+    }
+};
+
+// Convert all pages to images for export (runs in background)
+const convertAllPagesToImages = async (pdf: any) => {
+    try {
         const exportScale = 2.5;
         const pageImages: string[] = [];
         
@@ -501,6 +511,43 @@ const renderPdf = async () => {
         } else {
             emit('pdfImageConverted', pageImages);
         }
+    } catch (error: any) {
+        console.error('Error converting pages to images:', error);
+    }
+};
+
+const renderPdf = async () => {
+    if (!props.pdfBackgroundUrl || !pdfCanvasRef.value || !window.pdfjsLib) {
+        return;
+    }
+    
+    try {
+        // Use stored PDF document if available, otherwise load it
+        let pdf = pdfDocument.value;
+        if (!pdf || !pdfLoadingTask.value) {
+            // Create new loading task
+            const loadingTask = window.pdfjsLib.getDocument({
+                url: props.pdfBackgroundUrl,
+                withCredentials: false
+            });
+            pdfLoadingTask.value = loadingTask;
+            pdf = await loadingTask.promise;
+            pdfDocument.value = pdf; // Store for future use
+            
+            // Emit the number of pages detected when PDF is first loaded
+            emit('pdfPagesDetected', pdf.numPages);
+            
+            // Pre-load all pages
+            await preloadAllPages(pdf);
+        } else {
+            // PDF already loaded, just render current page from cache
+            if (allPagesLoaded.value) {
+                renderCurrentPageFromCache();
+            } else {
+                // If pages not yet loaded, load them now
+                await preloadAllPages(pdf);
+            }
+        }
         
         pdfLoading.value = false;
     } catch (error: any) {
@@ -509,15 +556,11 @@ const renderPdf = async () => {
     }
 };
 
-// Watch for page number changes to re-render the correct page
-watch(() => props.currentPageNumber, async () => {
-    if (pdfCanvasRef.value && props.pdfBackgroundUrl) {
-        // Ensure PDF is loaded before rendering
-        if (!pdfDocument.value) {
-            await loadPdf();
-        } else {
-            await renderPdf();
-        }
+// Watch for page number changes to display cached page
+watch(() => props.currentPageNumber, () => {
+    if (pdfCanvasRef.value && props.pdfBackgroundUrl && allPagesLoaded.value) {
+        // Just render from cache, no API call or re-rendering needed
+        renderCurrentPageFromCache();
     }
 });
 
@@ -526,6 +569,9 @@ watch(() => props.pdfBackgroundUrl, (newUrl) => {
     // Reset PDF document and loading task when URL changes
     pdfDocument.value = null;
     pdfLoadingTask.value = null;
+    allPagesLoaded.value = false;
+    cachedPageCanvases.value.clear();
+    cachedPageImages.value.clear();
     if (newUrl) {
         // Wait for next tick to ensure canvas is rendered
         setTimeout(() => {
@@ -536,10 +582,14 @@ watch(() => props.pdfBackgroundUrl, (newUrl) => {
     }
 }, { immediate: true });
 
-// Watch for scale changes to re-render PDF
+// Watch for scale changes to re-render PDF (need to reload all pages with new scale)
 watch(scale, () => {
-    if (props.pdfBackgroundUrl && pdfCanvasRef.value) {
-        loadPdf();
+    if (props.pdfBackgroundUrl && pdfCanvasRef.value && pdfDocument.value && allPagesLoaded.value) {
+        // Clear cache and reload all pages with new scale
+        allPagesLoaded.value = false;
+        cachedPageCanvases.value.clear();
+        cachedPageImages.value.clear();
+        preloadAllPages(pdfDocument.value);
     }
 });
 
