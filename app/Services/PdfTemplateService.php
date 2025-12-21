@@ -267,9 +267,9 @@ class PdfTemplateService
                 mkdir($dir, 0755, true);
             }
             
-            // Use jpeg format with optimized quality and resolution for faster conversion
+            // Use jpeg format with lower quality and resolution for faster conversion
             $command = sprintf(
-                'pdftoppm -jpeg -jpegopt quality=85 -f %d -l %d -r 200 %s %s 2>&1',
+                'pdftoppm -jpeg -jpegopt quality=70 -f %d -l %d -r 96 %s %s 2>&1',
                 $pageNumber,
                 $pageNumber,
                 escapeshellarg($pdfPath),
@@ -643,38 +643,42 @@ class PdfTemplateService
         $heightPoints = $height * 2.83465;
         
         $options = new Options();
+        // Speed optimizations - prioritize speed over quality
         $options->set('isHtml5ParserEnabled', true);
-        $options->set('isRemoteEnabled', true); // Enable remote images
-        $options->set('isPhpEnabled', true);
-        $options->set('defaultPaperSize', 'a4'); // Use A4 paper size
+        $options->set('isRemoteEnabled', true);
+        $options->set('isPhpEnabled', false); // Disable PHP for speed
+        $options->set('defaultPaperSize', 'a4');
         $options->set('defaultPaperWidth', $width . 'mm');
         $options->set('defaultPaperHeight', $height . 'mm');
-        // Note: Default font is set per field in the template, but we keep Arial as fallback
         $options->set('defaultFont', 'Arial');
-        // Optimize for speed: Use 150 DPI for faster generation (still good quality)
-        $options->set('dpi', 150); // 150 DPI for faster processing while maintaining good quality
-        $options->set('enableFontSubsetting', true);
+        // Reduce DPI significantly for faster generation (96 DPI is standard web DPI)
+        $options->set('dpi', 96); // Reduced from 150 for much faster processing
+        $options->set('enableFontSubsetting', false); // Disable for speed
         $options->set('enableCssFloat', true);
         $options->set('isJavascriptEnabled', false);
-        $options->set('isFontSubsettingEnabled', true);
-        // Optimize image handling
-        $options->set('isRemoteEnabled', true);
+        $options->set('isFontSubsettingEnabled', false); // Disable for speed
+        // Disable all debug features for speed
         $options->set('debugKeepTemp', false);
         $options->set('debugCss', false);
         $options->set('debugLayout', false);
-        // Enable compression for faster downloads and smaller file sizes
+        $options->set('logOutputFile', null); // Disable logging
+        // Enable compression
         $options->set('compress', true);
-        // Enable better image rendering
-        $options->set('enableHtml5Parser', true);
-        // Set image DPI to 200 for faster processing (reduced from 360)
-        $options->set('img_dpi', 200);
+        // Reduce image DPI significantly for faster processing
+        $options->set('img_dpi', 96); // Reduced from 200 for much faster processing
+        // Set temp directory to system temp for faster I/O
+        $options->set('tempDir', sys_get_temp_dir());
 
         $dompdf = new Dompdf($options);
-        $dompdf->loadHtml($html);
+        $dompdf->loadHtml($html, 'UTF-8');
         // Set paper size in points (width, height) - A4 dimensions
         $dompdf->setPaper([0, 0, $widthPoints, $heightPoints], 'portrait');
+        // Render with optimizations
         $dompdf->render();
-        return $dompdf->output();
+        // Get output and clean up memory immediately
+        $output = $dompdf->output();
+        unset($dompdf); // Free memory immediately
+        return $output;
     }
 }
 

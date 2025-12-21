@@ -223,41 +223,172 @@ class PdfTemplateController extends Controller
 
     public function generatePdfs(Request $request)
     {
-        $request->validate([
-            'template' => 'required|array',
-            'excel_data' => 'required|array',
-            'column_mapping' => 'required|array',
-            'pdf_file_path' => 'nullable|string',
-            'pdf_page_image' => 'nullable', // Can be string (single page) or array (multiple pages)
+        \Log::info('📥 PDF Generation Request Received', [
+            'method' => $request->method(),
+            'has_template' => $request->has('template'),
+            'has_excel_data' => $request->has('excel_data'),
+            'has_column_mapping' => $request->has('column_mapping'),
+            'content_type' => $request->header('Content-Type'),
+            'content_length' => $request->header('Content-Length'),
         ]);
+        
+        try {
+            $request->validate([
+                'template' => 'required|array',
+                'excel_data' => 'required|array',
+                'column_mapping' => 'required|array',
+                'pdf_file_path' => 'nullable|string',
+                'pdf_page_image' => 'nullable', // Can be string (single page) or array (multiple pages)
+            ]);
 
-        $template = $request->input('template');
-        $excelData = $request->input('excel_data');
-        $columnMapping = $request->input('column_mapping');
-        $pdfFilePath = $request->input('pdf_file_path');
-        $pdfPageImage = $request->input('pdf_page_image');
+            \Log::info('✅ Validation passed, processing request...');
 
-        // Log for debugging (remove in production)
-        \Log::info('PDF Generation', [
-            'template_fields' => count($template['fields'] ?? []),
-            'excel_rows' => count($excelData),
-            'column_mapping' => $columnMapping,
-            'has_pdf_file' => !empty($pdfFilePath),
-            'first_row_keys' => !empty($excelData) ? array_keys($excelData[0] ?? []) : [],
-        ]);
+            $template = $request->input('template');
+            $excelData = $request->input('excel_data');
+            $columnMapping = $request->input('column_mapping');
+            $pdfFilePath = $request->input('pdf_file_path');
+            $pdfPageImage = $request->input('pdf_page_image');
+            
+            \Log::info('📋 Request data extracted', [
+                'template_pages' => count($template['pages'] ?? []),
+                'excel_rows' => count($excelData),
+                'column_mapping_count' => count($columnMapping),
+                'has_pdf_file' => !empty($pdfFilePath),
+            ]);
 
-        $pdfPreviews = $this->pdfTemplateService->generatePdfsFromTemplate(
-            $template,
-            $excelData,
-            $columnMapping,
-            $pdfFilePath,
-            $pdfPageImage
-        );
+            // Validate template structure
+            if (empty($template['pages']) || !is_array($template['pages'])) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Template must have a pages array.',
+                    'pdfs' => [],
+                ], 422);
+            }
 
-        return response()->json([
-            'success' => true,
-            'message' => 'PDFs generated successfully',
-            'pdfs' => $pdfPreviews,
+            // Count total fields across all pages
+            $totalFields = 0;
+            foreach ($template['pages'] ?? [] as $page) {
+                $totalFields += count($page['fields'] ?? []);
+            }
+
+            // Log for debugging
+            \Log::info('PDF Generation Request', [
+                'template_pages' => count($template['pages'] ?? []),
+                'template_fields' => $totalFields,
+                'excel_rows' => count($excelData),
+                'column_mapping_count' => count($columnMapping),
+                'has_pdf_file' => !empty($pdfFilePath),
+                'has_pdf_image' => !empty($pdfPageImage),
+            ]);
+
+            // Start timing for generation
+            $generationStartTime = microtime(true);
+            
+            $pdfPreviews = $this->pdfTemplateService->generatePdfsFromTemplate(
+                $template,
+                $excelData,
+                $columnMapping,
+                $pdfFilePath,
+                $pdfPageImage
+            );
+
+            // Validate generated PDFs
+            if (empty($pdfPreviews) || !is_array($pdfPreviews)) {
+                \Log::warning('PDF Generation: No PDFs generated', [
+                    'excel_rows' => count($excelData),
+                    'template_pages' => count($template['pages'] ?? []),
+                ]);
+                
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No PDFs were generated. Please check your template and data.',
+                    'pdfs' => [],
+                ], 200);
+            }
+
+            // Validate each PDF has required fields
+            $validPdfs = [];
+            foreach ($pdfPreviews as $index => $pdf) {
+                if (isset($pdf['base64']) && !empty($pdf['base64']) && is_string($pdf['base64'])) {
+                    $validPdfs[] = $pdf;
+                } else {
+                    \Log::warning('PDF Generation: Invalid PDF at index ' . $index);
+                }
+            }
+
+            if (empty($validPdfs)) {
+                \Log::error('PDF Generation: No valid PDFs generated');
+                
+                return response()->json([
+                    'success' => false,
+                    'message' => 'PDFs were generated but are invalid. Please check your template and data.',
+                    'pdfs' => [],
+                ], 200);
+            }
+
+            // Calculate response size for logging
+            $responseSize = 0;
+            foreach ($validPdfs as $pdf) {
+                $responseSize += strlen($pdf['base64'] ?? '');
+            }
+            $responseSizeMB = round($responseSize / 1024 / 1024, 2);
+            $generationDuration = round((microtime(true) - $generationStartTime) * 1000, 2);
+            
+            \Log::info('✅ PDF Generation Success', [
+                'total_pdfs' => count($validPdfs),
+                'excel_rows' => count($excelData),
+                'response_size_mb' => $responseSizeMB,
+                'generation_time_ms' => $generationDuration,
+            ]);
+
+            \Log::info('📤 Sending response to client...');
+            
+            // Return PDFs directly in response (don't store in session - too slow)
+            $response = response()->json([
+                'success' => true,
+                'message' => 'PDFs generated successfully',
+                'pdfs' => $validPdfs,
+            ], 200, [
+                'Content-Type' => 'application/json',
+            ]);
+            
+            \Log::info('✅ Response sent successfully');
+            return $response;
+
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            \Log::error('PDF Generation: Validation Error', [
+                'errors' => $e->errors(),
+            ]);
+            
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation failed',
+                'errors' => $e->errors(),
+                'pdfs' => [],
+            ], 422);
+
+        } catch (\Exception $e) {
+            \Log::error('PDF Generation Error: ' . $e->getMessage(), [
+                'trace' => $e->getTraceAsString(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+            ]);
+            
+            return response()->json([
+                'success' => false,
+                'message' => 'An error occurred while generating PDFs: ' . $e->getMessage(),
+                'pdfs' => [],
+            ], 500);
+        }
+    }
+
+    public function preview(Request $request): Response
+    {
+        // PDFs will be loaded from localStorage on frontend
+        // This page just renders the component
+        return Inertia::render('PdfTemplate/Preview', [
+            'pdfs' => [], // Empty initially, will be loaded from localStorage
+            'timestamp' => now()->timestamp,
         ]);
     }
 }

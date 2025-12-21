@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import AppLayout from '@/layouts/AppLayout.vue';
 import { Head } from '@inertiajs/vue3';
-import { ref, computed, watch, onBeforeUnmount, nextTick } from 'vue';
+import { ref, computed, watch, onBeforeUnmount, nextTick, type ComponentPublicInstance } from 'vue';
 import PdfTemplateBuilder from '@/components/PdfTemplate/PdfTemplateBuilder.vue';
 import ExcelUploader from '@/components/PdfTemplate/ExcelUploader.vue';
 import PdfUploader from '@/components/PdfTemplate/PdfUploader.vue';
@@ -79,6 +79,7 @@ const generatedPdfs = ref<any[]>([]);
 const isGenerating = ref(false);
 const showPreviewModal = ref(false);
 const pdfPreviewUrl = ref<string | null>(null);
+const modalKey = ref(0); // Force Dialog re-render on each generation
 const showFieldDialog = ref(false);
 const showEditFieldDialog = ref(false);
 const showExcelViewModal = ref(false);
@@ -107,8 +108,8 @@ const globalLoading = ref(false);
 const loadingMessage = ref('Processing...');
 const loadingType = ref<'upload' | 'generate' | 'download' | 'pdf-load' | 'default'>('default');
 let generateAbortController: AbortController | null = null;
-let generateTimeoutId: NodeJS.Timeout | null = null;
-let progressUpdateInterval: NodeJS.Timeout | null = null;
+let generateTimeoutId: ReturnType<typeof setTimeout> | null = null;
+let progressUpdateInterval: ReturnType<typeof setInterval> | null = null;
 const pdfUploaderRef = ref<ComponentPublicInstance | null>(null);
 const excelUploaderRef = ref<ComponentPublicInstance | null>(null);
 
@@ -339,101 +340,162 @@ const generatePdfs = async () => {
     // Create new abort controller
     generateAbortController = new AbortController();
     
-    // Set loading state
+    // Set generating state (only to disable button, no popup)
     isGenerating.value = true;
-    globalLoading.value = true;
-    loadingMessage.value = 'Generating PDFs...';
-    loadingType.value = 'generate';
     
     try {
-        const response = await axios.post('/pdf-templates/generate', {
-            template: template.value,
-            excel_data: excelData.value,
-            column_mapping: columnMapping.value,
-            pdf_file_path: uploadedPdfPath.value || null,
-            pdf_page_image: pdfPageImageBase64.value || null,
-        }, {
-            timeout: 600000, // 10 minutes timeout
-            signal: generateAbortController.signal,
-        });
+        const requestStartTime = Date.now();
+        
+        // Add timeout warning (increased to 30 seconds)
+        const timeoutWarning = setTimeout(() => {
+            // Timeout warning (silent)
+        }, 30000);
+        
+        let response;
+        try {
+            response = await axios.post('/pdf-templates/generate', {
+                template: template.value,
+                excel_data: excelData.value,
+                column_mapping: columnMapping.value,
+                pdf_file_path: uploadedPdfPath.value || null,
+                pdf_page_image: pdfPageImageBase64.value || null,
+            }, {
+                timeout: 1800000, // 30 minutes timeout (increased from 10 minutes)
+                signal: generateAbortController.signal,
+                maxContentLength: Infinity,
+                maxBodyLength: Infinity,
+                onUploadProgress: (progressEvent) => {
+                    // Upload progress tracking (silent)
+                },
+            });
+            
+            clearTimeout(timeoutWarning);
+        } catch (requestError) {
+            clearTimeout(timeoutWarning);
+            throw requestError;
+        }
+
+        const requestDuration = Date.now() - requestStartTime;
 
         // Process successful response
-        if (!response.data) {
+        if (!response || !response.data) {
             throw new Error('No data received from server');
+        }
+
+        // Check for success flag from backend (if present)
+        if (response.data.success === false) {
+            throw new Error(response.data.message || 'PDF generation failed');
         }
 
         // Get PDFs from response
         const pdfsData = response.data.pdfs || [];
-        generatedPdfs.value = Array.isArray(pdfsData) ? pdfsData : [];
         
-        if (!Array.isArray(generatedPdfs.value)) {
-            throw new Error('Invalid response format from server');
+        if (!Array.isArray(pdfsData)) {
+            throw new Error('Invalid response format from server: pdfs is not an array');
         }
         
-        // Create blob URL for preview if PDFs exist
+        // Validate PDFs were generated
+        if (pdfsData.length === 0) {
+            throw new Error('No PDFs were generated. Please check your template and data.');
+        }
+
+        // Set generated PDFs
+        generatedPdfs.value = pdfsData;
+        
+        // Create blob URL for preview
         if (generatedPdfs.value.length > 0 && generatedPdfs.value[0]?.base64) {
             try {
-                // Clean up previous blob URL
                 if (pdfPreviewUrl.value) {
                     URL.revokeObjectURL(pdfPreviewUrl.value);
                 }
-                
-                const byteCharacters = atob(generatedPdfs.value[0].base64);
-                const byteNumbers = new Array(byteCharacters.length);
-                for (let i = 0; i < byteCharacters.length; i++) {
-                    byteNumbers[i] = byteCharacters.charCodeAt(i);
+                const base64String = generatedPdfs.value[0].base64.trim();
+                if (base64String && base64String.length > 0) {
+                    const byteCharacters = atob(base64String);
+                    const byteNumbers = new Array(byteCharacters.length);
+                    for (let i = 0; i < byteCharacters.length; i++) {
+                        byteNumbers[i] = byteCharacters.charCodeAt(i);
+                    }
+                    const byteArray = new Uint8Array(byteNumbers);
+                    const blob = new Blob([byteArray], { type: 'application/pdf' });
+                    pdfPreviewUrl.value = URL.createObjectURL(blob);
                 }
-                const byteArray = new Uint8Array(byteNumbers);
-                const blob = new Blob([byteArray], { type: 'application/pdf' });
-                pdfPreviewUrl.value = URL.createObjectURL(blob);
             } catch (error) {
-                console.error('Error creating blob URL:', error);
                 pdfPreviewUrl.value = null;
             }
         }
         
-        // Close loading modal
+        // Reset generating state
         isGenerating.value = false;
         globalLoading.value = false;
         loadingType.value = 'default';
-        loadingMessage.value = 'Processing...';
         
-        // Open preview modal
-        if (generatedPdfs.value.length > 0) {
-            await nextTick();
+        // FORCE OPEN MODAL - Multiple aggressive attempts
+        modalKey.value++;
+        showPreviewModal.value = true;
+        
+        // Force with nextTick
+        await nextTick();
+        showPreviewModal.value = true;
+        
+        // Force with requestAnimationFrame
+        requestAnimationFrame(() => {
             showPreviewModal.value = true;
-        } else {
-            alert('No PDFs were generated. Please check your template and data.');
-        }
+        });
+        
+        // Force with multiple timeouts
+        setTimeout(() => {
+            showPreviewModal.value = true;
+        }, 0);
+        
+        setTimeout(() => {
+            showPreviewModal.value = true;
+        }, 50);
+        
+        setTimeout(() => {
+            showPreviewModal.value = true;
+        }, 100);
+        
+        setTimeout(() => {
+            showPreviewModal.value = true;
+        }, 200);
+        
+        setTimeout(() => {
+            showPreviewModal.value = true;
+        }, 500);
+        
+        setTimeout(() => {
+            showPreviewModal.value = true;
+        }, 1000);
         
     } catch (error: any) {
         // Don't show error if request was cancelled
         if (axios.isCancel(error) || error.name === 'AbortError' || error.code === 'ERR_CANCELED') {
-            console.log('PDF generation was cancelled');
+            isGenerating.value = false;
             return;
         }
-        
-        console.error('PDF Generation Error:', error);
         
         let errorMessage = 'Error generating PDFs. ';
         
         if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
-            errorMessage += 'The request timed out. Please try again with fewer rows.';
+            errorMessage += 'The request timed out. Please try again with fewer rows or check server logs.';
         } else if (error.response) {
-            errorMessage += error.response.data?.message || `Server error (${error.response.status})`;
+            const responseData = error.response.data;
+            if (responseData?.errors) {
+                const validationErrors = Object.values(responseData.errors).flat();
+                errorMessage += validationErrors.join(', ') || 'Validation error occurred.';
+            } else {
+                errorMessage += responseData?.message || `Server error (${error.response.status}). Check server logs.`;
+            }
         } else if (error.request) {
-            errorMessage += 'No response from server. Please check your connection.';
+            errorMessage += 'No response from server. Please check your connection and server logs.';
         } else {
-            errorMessage += error.message || 'Unknown error occurred';
+            errorMessage += error.message || 'Unknown error occurred.';
         }
         
         alert(errorMessage);
     } finally {
-        // Always reset loading state
+        // Always reset generating state
         isGenerating.value = false;
-        globalLoading.value = false;
-        loadingType.value = 'default';
-        loadingMessage.value = 'Processing...';
         
         // Cleanup
         if (progressUpdateInterval) {
@@ -448,9 +510,9 @@ const generatePdfs = async () => {
     }
 };
 
+
 const downloadPdfFromBase64 = (pdf: { filename: string; base64: string }) => {
     try {
-        // Convert base64 to blob for faster download
         const byteCharacters = atob(pdf.base64);
         const byteNumbers = new Array(byteCharacters.length);
         for (let i = 0; i < byteCharacters.length; i++) {
@@ -459,7 +521,6 @@ const downloadPdfFromBase64 = (pdf: { filename: string; base64: string }) => {
         const byteArray = new Uint8Array(byteNumbers);
         const blob = new Blob([byteArray], { type: 'application/pdf' });
         
-        // Use blob URL for faster download
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.href = url;
@@ -468,10 +529,8 @@ const downloadPdfFromBase64 = (pdf: { filename: string; base64: string }) => {
         link.click();
         document.body.removeChild(link);
         
-        // Clean up blob URL after a short delay
         setTimeout(() => URL.revokeObjectURL(url), 100);
     } catch (error) {
-        // Fallback to data URL if blob fails
         const link = document.createElement('a');
         link.href = `data:application/pdf;base64,${pdf.base64}`;
         link.download = pdf.filename;
@@ -481,26 +540,14 @@ const downloadPdfFromBase64 = (pdf: { filename: string; base64: string }) => {
     }
 };
 
-
 const downloadAllPdfs = async () => {
     if (generatedPdfs.value.length === 0) return;
     
-    globalLoading.value = true;
-    loadingMessage.value = `Downloading PDFs (0/${generatedPdfs.value.length})...`;
-    loadingType.value = 'download';
-    
-    try {
-    // Download all PDFs with minimal delay for faster batch downloads
-        for (let index = 0; index < generatedPdfs.value.length; index++) {
-            loadingMessage.value = `Downloading PDFs (${index + 1}/${generatedPdfs.value.length})...`;
-            downloadPdfFromBase64(generatedPdfs.value[index]);
-            // Small delay to prevent browser from blocking multiple downloads
-            if (index < generatedPdfs.value.length - 1) {
-                await new Promise(resolve => setTimeout(resolve, 100));
-            }
+    for (let index = 0; index < generatedPdfs.value.length; index++) {
+        downloadPdfFromBase64(generatedPdfs.value[index]);
+        if (index < generatedPdfs.value.length - 1) {
+            await new Promise(resolve => setTimeout(resolve, 200));
         }
-    } finally {
-        globalLoading.value = false;
     }
 };
 
@@ -635,6 +682,47 @@ watch(showEditFieldDialog, (isOpen) => {
         };
     }
 });
+
+// Watch for generated PDFs and open modal automatically
+// FORCE OPEN MODAL when PDFs are generated - Aggressive
+watch(generatedPdfs, (newPdfs, oldPdfs) => {
+    if (newPdfs && newPdfs.length > 0 && (!oldPdfs || oldPdfs.length === 0)) {
+        // Immediate
+        showPreviewModal.value = true;
+        
+        // With nextTick
+        nextTick().then(() => {
+            showPreviewModal.value = true;
+        });
+        
+        // With requestAnimationFrame
+        requestAnimationFrame(() => {
+            showPreviewModal.value = true;
+        });
+        
+        // Multiple timeouts
+        setTimeout(() => {
+            showPreviewModal.value = true;
+        }, 0);
+        
+        setTimeout(() => {
+            showPreviewModal.value = true;
+        }, 50);
+        
+        setTimeout(() => {
+            showPreviewModal.value = true;
+        }, 100);
+        
+        setTimeout(() => {
+            showPreviewModal.value = true;
+        }, 200);
+        
+        setTimeout(() => {
+            showPreviewModal.value = true;
+        }, 500);
+    }
+}, { deep: true, immediate: false });
+
 
 </script>
 
@@ -1329,7 +1417,7 @@ watch(showEditFieldDialog, (isOpen) => {
         </div>
 
         <!-- PDF Preview Modal -->
-        <Dialog v-model:open="showPreviewModal">
+        <Dialog :open="showPreviewModal" @update:open="showPreviewModal = $event" :key="`preview-modal-${modalKey}`">
             <DialogContent class="!w-[80vw] !max-w-[80vw] max-h-[90vh] overflow-hidden flex flex-col mx-auto">
                 <DialogHeader>
                     <DialogTitle>PDF Preview</DialogTitle>
@@ -1344,21 +1432,17 @@ watch(showEditFieldDialog, (isOpen) => {
                         <div class="border rounded-lg overflow-hidden">
                             <div class="bg-white">
                                 <div class="aspect-[1/1.414] w-full" style="min-height: 600px;">
-                                    <!-- Try blob URL first (more reliable) -->
+                                    <!-- Try blob URL first -->
                                     <iframe
                                         v-if="pdfPreviewUrl"
                                         :src="pdfPreviewUrl"
                                         class="w-full h-full border-0"
-                                        @error="(e) => { console.error('PDF iframe error:', e); }"
-                                        @load="() => { console.log('PDF iframe loaded successfully'); }"
                                     ></iframe>
                                     <!-- Fallback to data URI -->
                                     <iframe
                                         v-else-if="generatedPdfs[0]?.base64"
                                         :src="`data:application/pdf;base64,${generatedPdfs[0].base64}`"
                                         class="w-full h-full border-0"
-                                        @error="(e) => { console.error('PDF iframe error:', e); }"
-                                        @load="() => { console.log('PDF iframe loaded successfully'); }"
                                     ></iframe>
                                     <!-- Fallback to object tag -->
                                     <object
@@ -1458,4 +1542,5 @@ watch(showEditFieldDialog, (isOpen) => {
     }
 }
 </style>
+
 
