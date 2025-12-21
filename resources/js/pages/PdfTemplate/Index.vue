@@ -429,43 +429,15 @@ const generatePdfs = async () => {
         globalLoading.value = false;
         loadingType.value = 'default';
         
-        // FORCE OPEN MODAL - Multiple aggressive attempts
-        modalKey.value++;
-        showPreviewModal.value = true;
-        
-        // Force with nextTick
+        // Wait for state to settle
         await nextTick();
+        
+        // Open modal with a fresh key to force re-render
+        modalKey.value++;
+        await nextTick();
+        
+        // Set modal to open - simple and direct
         showPreviewModal.value = true;
-        
-        // Force with requestAnimationFrame
-        requestAnimationFrame(() => {
-            showPreviewModal.value = true;
-        });
-        
-        // Force with multiple timeouts
-        setTimeout(() => {
-            showPreviewModal.value = true;
-        }, 0);
-        
-        setTimeout(() => {
-            showPreviewModal.value = true;
-        }, 50);
-        
-        setTimeout(() => {
-            showPreviewModal.value = true;
-        }, 100);
-        
-        setTimeout(() => {
-            showPreviewModal.value = true;
-        }, 200);
-        
-        setTimeout(() => {
-            showPreviewModal.value = true;
-        }, 500);
-        
-        setTimeout(() => {
-            showPreviewModal.value = true;
-        }, 1000);
         
     } catch (error: any) {
         // Don't show error if request was cancelled
@@ -685,43 +657,14 @@ watch(showEditFieldDialog, (isOpen) => {
 
 // Watch for generated PDFs and open modal automatically
 // FORCE OPEN MODAL when PDFs are generated - Aggressive
+// Watch for PDFs and open modal - clean approach
 watch(generatedPdfs, (newPdfs, oldPdfs) => {
     if (newPdfs && newPdfs.length > 0 && (!oldPdfs || oldPdfs.length === 0)) {
-        // Immediate
-        showPreviewModal.value = true;
-        
-        // With nextTick
         nextTick().then(() => {
             showPreviewModal.value = true;
         });
-        
-        // With requestAnimationFrame
-        requestAnimationFrame(() => {
-            showPreviewModal.value = true;
-        });
-        
-        // Multiple timeouts
-        setTimeout(() => {
-            showPreviewModal.value = true;
-        }, 0);
-        
-        setTimeout(() => {
-            showPreviewModal.value = true;
-        }, 50);
-        
-        setTimeout(() => {
-            showPreviewModal.value = true;
-        }, 100);
-        
-        setTimeout(() => {
-            showPreviewModal.value = true;
-        }, 200);
-        
-        setTimeout(() => {
-            showPreviewModal.value = true;
-        }, 500);
     }
-}, { deep: true, immediate: false });
+}, { deep: true });
 
 
 </script>
@@ -1417,7 +1360,7 @@ watch(generatedPdfs, (newPdfs, oldPdfs) => {
         </div>
 
         <!-- PDF Preview Modal -->
-        <Dialog :open="showPreviewModal" @update:open="showPreviewModal = $event" :key="`preview-modal-${modalKey}`">
+        <Dialog v-model:open="showPreviewModal" :key="`preview-modal-${modalKey}`">
             <DialogContent class="!w-[80vw] !max-w-[80vw] max-h-[90vh] overflow-hidden flex flex-col mx-auto">
                 <DialogHeader>
                     <DialogTitle>PDF Preview</DialogTitle>
